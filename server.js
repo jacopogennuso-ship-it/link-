@@ -4,17 +4,15 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Servi pagina utente
+// Gestione route principale
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Dashboard admin con password
-app.get('/admin', (req, res) => {
-  if (req.query.pass !== 'secret123') {
-    return res.status(403).send('Accesso negato');
+  // Se c'è il parametro admin, serve la pagina admin
+  if (req.query.admin) {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+    return;
   }
-  res.sendFile(path.join(__dirname, 'admin.html'));
+  // Altrimenti serve la pagina client
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // === ADMIN DASHBOARD (admin.html) ===
@@ -169,17 +167,28 @@ const server = app.listen(PORT, () => {
 });
 
 server.on('upgrade', (req, socket, head) => {
-  const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = url.pathname;
 
-  if (pathname === '/bg-stream') {
-    bgWss.handleUpgrade(req, socket, head, ws => {
-      bgWss.emit('connection', ws, req);
-    });
-  } else if (pathname === '/bg-admin') {
-    adminWss.handleUpgrade(req, socket, head, ws => {
-      adminWss.emit('connection', ws, req);
-    });
-  } else {
+    console.log('[WS] Richiesta upgrade per:', pathname);
+
+    if (pathname === '/bg-stream') {
+      bgWss.handleUpgrade(req, socket, head, ws => {
+        console.log('[WS] Client connesso a bg-stream');
+        bgWss.emit('connection', ws, req);
+      });
+    } else if (pathname === '/bg-admin') {
+      adminWss.handleUpgrade(req, socket, head, ws => {
+        console.log('[WS] Admin connesso');
+        adminWss.emit('connection', ws, req);
+      });
+    } else {
+      console.log('[WS] Pathname non valido:', pathname);
+      socket.destroy();
+    }
+  } catch (err) {
+    console.error('[WS] Errore upgrade:', err);
     socket.destroy();
   }
 });
