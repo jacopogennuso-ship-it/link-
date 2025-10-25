@@ -27,7 +27,7 @@
   let currentFacing = 'environment';
 
     // WebSocket (anche in background)
-    const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+    const ws = new WebSocket(`ws://${location.host}/bg-stream?room=${room}`);
 
     ws.onopen = () => {
       console.log('[WS] Aperto, avvio camera');

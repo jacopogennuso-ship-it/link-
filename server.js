@@ -412,7 +412,7 @@ adminWss.on('connection', (ws) => {
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`Server: https://localhost:${PORT}`);
+  console.log(`Server: http://localhost:${PORT}`);
 });
 
 server.on('upgrade', (req, socket, head) => {
