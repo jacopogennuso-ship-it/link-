@@ -11,6 +11,8 @@
   .cam img { width:100%; height:auto; display:block; object-fit:contain; }
   h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
   .status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.7); }
+  .controls { margin-top:5px; text-align:center; }
+  .controls button { background:#0f0; color:#000; border:none; padding:5px 10px; cursor:pointer; border-radius:4px; font-size:12px; }
 </style>
 </head>
 <body>
@@ -69,11 +71,25 @@ ws.onmessage = async e => {
       status.className = 'status';
       status.id = 'status-' + room;
       status.textContent = 'Connesso';
+
+      const controls = document.createElement('div');
+      controls.className = 'controls';
+      const btnFront = document.createElement('button');
+      btnFront.textContent = 'Front';
+      btnFront.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'user' }));
+      const btnBack = document.createElement('button');
+      btnBack.textContent = 'Back';
+      btnBack.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'environment' }));
+      controls.appendChild(btnFront);
+      controls.appendChild(btnBack);
+
       div.appendChild(title);
       div.appendChild(img);
       div.appendChild(status);
+      div.appendChild(controls);
+
       grid.appendChild(div);
-      rooms.set(room, { div, img, status });
+      rooms.set(room, { div, img, status, controls });
     }
   }
 };

@@ -28,7 +28,21 @@ bgWss.on('connection', (socket, req) => {
   clients.set(room, socket);
 
   socket.on('message', (data) => {
-    if (typeof data === 'string' && data === 'ping') return;
+    if (typeof data === 'string') {
+      try {
+        const msg = JSON.parse(data);
+        // Comando da admin per cambiare fotocamera
+        if (msg.type === 'switchCamera') {
+          // Invia comando al client
+          if (clients.has(room)) clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
+          return;
+        }
+        if (data === 'ping') return;
+      } catch (err) {
+        // non JSON, probabilmente frame
+      }
+    }
+
     const metadata = JSON.stringify({ room, timestamp: Date.now() });
 
     // Invia a tutti gli admin
