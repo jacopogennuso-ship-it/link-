@@ -7,8 +7,6 @@ const PORT = process.env.PORT || 3000;
 
 // Serve client
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-// Serve admin con password
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
@@ -18,7 +16,7 @@ app.get('/admin', (req, res) => {
 const bgWss = new ws.Server({ noServer: true });
 const adminWss = new ws.Server({ noServer: true });
 
-const clients = new Map(); // room -> ws
+const clients = new Map();
 
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -29,11 +27,8 @@ bgWss.on('connection', (socket, req) => {
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
-        if (msg.type === 'switchCamera') {
-          // Invia comando al client specifico
-          if (clients.has(room)) {
-            clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
-          }
+        if (msg.type === 'switchCamera' && clients.has(room)) {
+          clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
           return;
         }
         if (data === 'ping') return;
