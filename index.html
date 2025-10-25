@@ -41,7 +41,8 @@
         ws.close();
       }
 
-      ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+  const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/bg-stream?room=${room}`);
 
       ws.onopen = () => {
         log('WebSocket connesso');

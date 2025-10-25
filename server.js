@@ -77,7 +77,8 @@ const adminHtml = `
     }
     
     function connectWebSocket() {
-      ws = new WebSocket('wss://' + location.host + '/bg-admin');
+      const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
+      ws = new WebSocket(proto + '://' + location.host + '/bg-admin');
       
       ws.onopen = () => {
         log('WebSocket connesso');
