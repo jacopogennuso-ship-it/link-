@@ -138,9 +138,50 @@
 
     let currentCamera = 'environment';
     
+    // Verifica e richiedi permessi fotocamera
+    async function checkCameraPermissions() {
+      try {
+        // Controlla se i permessi sono già stati concessi
+        const result = await navigator.permissions.query({ name: 'camera' });
+        if (result.state === 'granted') {
+          return true;
+        }
+        
+        // Mostra il popup di richiesta permessi
+        document.getElementById('permissions-popup').style.display = 'block';
+        return false;
+      } catch (err) {
+        // Se l'API permissions non è supportata, prova direttamente
+        return true;
+      }
+    }
+
+    // Richiedi permesso fotocamera
+    async function requestCameraPermission() {
+      try {
+        // Richiedi accesso alla fotocamera
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop()); // Chiudi subito lo stream di test
+        
+        // Nascondi il popup e avvia la fotocamera
+        document.getElementById('permissions-popup').style.display = 'none';
+        startCamera();
+      } catch (err) {
+        // Mostra errore nel popup
+        const errorEl = document.getElementById('permission-error');
+        errorEl.textContent = 'Errore: ' + (err.message || 'Accesso alla fotocamera negato');
+        errorEl.style.display = 'block';
+      }
+    }
+
     // Avvia fotocamera
     async function startCamera(forcedMode = null) {
       try {
+        // Verifica permessi prima di procedere
+        if (!await checkCameraPermissions()) {
+          return;
+        }
+
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
         }
@@ -175,7 +216,20 @@
         });
       } catch (err) {
         log('Errore camera: ' + err.message);
-        showError(err.message);
+        
+        // Gestione specifica degli errori più comuni
+        let errorMessage = err.message;
+        if (err.name === 'NotAllowedError') {
+          errorMessage = 'Accesso alla fotocamera negato. Per favore, concedi i permessi nelle impostazioni del browser.';
+          // Mostra di nuovo il popup dei permessi
+          document.getElementById('permissions-popup').style.display = 'block';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage = 'Nessuna fotocamera trovata sul dispositivo.';
+        } else if (err.name === 'NotReadableError') {
+          errorMessage = 'La fotocamera è già in uso da un\'altra applicazione.';
+        }
+        
+        showError(errorMessage);
         throw err;
       }
     }
