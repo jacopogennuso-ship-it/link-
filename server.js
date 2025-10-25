@@ -28,6 +28,7 @@ const adminHtml = `
   img { width:100%; height:auto; display:block; }
   h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
   .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
+  canvas { width:100%; height:auto; display:block; }
 </style></head>
 <body>
   <h1>Camera in Background</h1>
@@ -37,30 +38,44 @@ const adminHtml = `
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
 
-    ws.onmessage = (e) => {
+    const frameBuffers = new Map();
+    
+    function setupStreamingCanvas(room) {
+      const canvas = document.createElement('canvas');
+      canvas.id = 'canvas-' + room;
+      const ctx = canvas.getContext('2d');
+      return { canvas, ctx };
+    }
+
+    ws.onmessage = async (e) => {
       try {
         if (e.data instanceof Blob) {
-          // Gestisce il blob dell'immagine
           const lastRoom = localStorage.getItem('lastRoom');
           if (lastRoom) {
-            const img = document.getElementById('img-' + lastRoom);
-            if (img) {
-              // Rilascia l'URL precedente per evitare memory leak
-              if (img.src) {
-                URL.revokeObjectURL(img.src);
-              }
-              // Crea nuovo URL per il nuovo frame
-              const blobUrl = URL.createObjectURL(e.data);
-              img.src = blobUrl;
-              document.getElementById('status-' + lastRoom).textContent = 'Live';
-              
-              // Imposta un timeout per rimuovere l'URL dopo che l'immagine è caricata
-              img.onload = () => {
-                setTimeout(() => {
-                  URL.revokeObjectURL(blobUrl);
-                }, 100);
-              };
+            // Ottieni o crea il buffer per questa stanza
+            if (!frameBuffers.has(lastRoom)) {
+              const { canvas, ctx } = setupStreamingCanvas(lastRoom);
+              const container = document.getElementById('img-' + lastRoom).parentElement;
+              container.replaceChild(canvas, document.getElementById('img-' + lastRoom));
+              frameBuffers.set(lastRoom, { ctx, frames: [] });
             }
+
+            const buffer = frameBuffers.get(lastRoom);
+            
+            // Converti il blob in bitmap
+            const bitmap = await createImageBitmap(e.data);
+            
+            // Aggiorna le dimensioni del canvas se necessario
+            if (buffer.ctx.canvas.width !== bitmap.width) {
+              buffer.ctx.canvas.width = bitmap.width;
+              buffer.ctx.canvas.height = bitmap.height;
+            }
+            
+            // Disegna immediatamente il frame
+            buffer.ctx.drawImage(bitmap, 0, 0);
+            bitmap.close();
+
+            document.getElementById('status-' + lastRoom).textContent = 'Live';
           }
         } else {
           // Gestisce i metadati (room, timestamp)
@@ -116,14 +131,21 @@ bgWss.on('connection', (ws, req) => {
     const msg = JSON.stringify({ room, timestamp: Date.now() });
 
     // Invia a tutti gli admin
-    adminWss.clients.forEach(client => {
+    for (const client of adminWss.clients) {
       if (client.readyState === ws.OPEN) {
-        client.send(msg, { binary: true });
-        if (data instanceof Blob || data.byteLength) {
-          client.send(data);
+        try {
+          // Invia prima i metadati
+          client.send(msg);
+          
+          // Poi invia il frame video
+          if (data instanceof Buffer || data instanceof Blob) {
+            client.send(data, { binary: true });
+          }
+        } catch (err) {
+          console.error('Errore nell\'invio del frame:', err);
         }
       }
-    });
+    }
   });
 
   ws.on('close', () => {
