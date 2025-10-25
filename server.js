@@ -43,11 +43,153 @@ const adminHtml = `
   button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 4px; cursor:pointer; }
   button:hover { background:#fff; }
   .debug { color:#0f0; font-size:12px; padding:4px; word-wrap:break-word; }
-</style></head>
+</style>
+</head>
 <body>
   <h1>Camera in Background</h1>
   <div id="grid" class="grid"></div>
   <script>
+    // Dichiarazioni globali
+    const grid = document.getElementById('grid');
+    const ws = new WebSocket('wss://' + location.host + '/bg-admin');
+    const rooms = new Map();
+    const sourceBuffers = new Map();
+    const mediaSourceMap = new Map();
+    let currentRoom = null;
+
+    // Funzione per creare un nuovo MediaSource per una stanza
+    function createMediaSource(room) {
+      const mediaSource = new MediaSource();
+      const video = document.getElementById('video-' + room);
+      
+      mediaSource.addEventListener('sourceopen', () => {
+        console.log('[ADMIN] MediaSource aperto per', room);
+        try {
+          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
+          sourceBuffers.set(room, sourceBuffer);
+          sourceBuffer.addEventListener('updateend', () => {
+            console.log('[ADMIN] Buffer aggiornato per', room);
+          });
+        } catch (err) {
+          console.error('[ADMIN] Errore creazione SourceBuffer:', err);
+          document.getElementById('debug-' + room).textContent = 
+            'Errore inizializzazione video: ' + err.message;
+        }
+      });
+
+      video.src = URL.createObjectURL(mediaSource);
+      mediaSourceMap.set(room, mediaSource);
+      return mediaSource;
+    }
+
+    // Invia comando cambio camera
+    function sendCameraCommand(room, mode) {
+      ws.send(JSON.stringify({ type: 'camera', room, mode }));
+    }
+
+    // Funzione per reinizializzare il MediaSource
+    function resetMediaSource(room) {
+      if (mediaSourceMap.has(room)) {
+        const oldMediaSource = mediaSourceMap.get(room);
+        if (oldMediaSource.readyState === 'open') {
+          try {
+            const sourceBuffer = sourceBuffers.get(room);
+            if (sourceBuffer) {
+              oldMediaSource.removeSourceBuffer(sourceBuffer);
+            }
+          } catch (err) {
+            console.error('[ADMIN] Errore rimozione SourceBuffer:', err);
+          }
+        }
+        mediaSourceMap.delete(room);
+        sourceBuffers.delete(room);
+      }
+      return createMediaSource(room);
+    }
+
+    // Gestione messaggi WebSocket
+    ws.onmessage = async (e) => {
+      try {
+        // Se il messaggio è JSON, contiene metadati
+        if (typeof e.data === 'string') {
+          const meta = JSON.parse(e.data);
+          
+          // Se è il messaggio di benvenuto, ignora
+          if (meta.type === 'welcome') {
+            console.log('[ADMIN] Connesso al server');
+            return;
+          }
+          
+          // Verifica che meta.room esista
+          if (!meta.room) {
+            console.error('[ADMIN] Meta ricevuto senza room:', meta);
+            return;
+          }
+          
+          if (meta.offline) {
+            if (rooms.has(meta.room)) {
+              document.getElementById('status-' + meta.room).textContent = 'Offline';
+              document.getElementById('debug-' + meta.room).textContent = 'Camera disconnessa';
+              console.log('[ADMIN] Camera', meta.room, 'offline');
+            }
+            return;
+          }
+          
+          currentRoom = meta.room;
+          console.log('[ADMIN] Ricevuto meta per', currentRoom, meta);
+        } 
+        // Gestione frame video
+        else if (e.data instanceof Blob && currentRoom) {
+          if (!rooms.has(currentRoom)) {
+            const div = document.createElement('div');
+            div.className = 'cam';
+            div.innerHTML = \`
+              <h2>\${currentRoom}</h2>
+              <video id="video-\${currentRoom}" autoplay playsinline></video>
+              <div class="status" id="status-\${currentRoom}">Online</div>
+              <div class="controls">
+                <button onclick="sendCameraCommand('\${currentRoom}','environment')">Posteriore</button>
+                <button onclick="sendCameraCommand('\${currentRoom}','user')">Anteriore</button>
+              </div>
+              <div class="debug" id="debug-\${currentRoom}"></div>
+            \`;
+            grid.appendChild(div);
+            rooms.set(currentRoom, div);
+            createMediaSource(currentRoom);
+            console.log('[ADMIN] Creata view per', currentRoom);
+          }
+
+          const sourceBuffer = sourceBuffers.get(currentRoom);
+          if (!sourceBuffer || sourceBuffer.updating) {
+            console.log('[ADMIN] Buffer non pronto per', currentRoom);
+            return;
+          }
+
+          try {
+            const arrayBuffer = await e.data.arrayBuffer();
+            sourceBuffer.appendBuffer(arrayBuffer);
+            document.getElementById('status-' + currentRoom).textContent = 'Live';
+            document.getElementById('debug-' + currentRoom).textContent = 
+              \`Frame ricevuto: \${arrayBuffer.byteLength} bytes\`;
+          } catch (err) {
+            console.error('[ADMIN] Errore append buffer:', err);
+            document.getElementById('debug-' + currentRoom).textContent = 
+              'Errore decodifica: ' + err.message;
+            
+            // Se il MediaSource è in errore, prova a reinizializzarlo
+            if (err.name === 'InvalidStateError') {
+              console.log('[ADMIN] Tento reinizializzazione MediaSource per', currentRoom);
+              resetMediaSource(currentRoom);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[ADMIN] Errore generale:', err);
+      }
+    };
+  </script>
+</body>
+</html>`;
     const grid = document.getElementById('grid');
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
@@ -183,6 +325,10 @@ const adminHtml = `
       } catch (err) {
         console.error('[ADMIN] Errore generale:', err);
       }
+    };
+  </script>
+</body>
+</html>`;
         console.log('[ADMIN] Frame mostrato per', currentRoom, url);
       }
     };
