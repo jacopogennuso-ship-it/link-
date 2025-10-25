@@ -4,14 +4,27 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Gestione route principale
+// Abilita CORS per lo streaming
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
+// Gestione route principale e admin
 app.get('/', (req, res) => {
+  console.log('[HTTP] Richiesta pagina, query:', req.query);
+  
   // Se c'è il parametro admin, serve la pagina admin
   if (req.query.admin) {
+    console.log('[HTTP] Servendo pagina admin');
     res.sendFile(path.join(__dirname, 'admin.html'));
     return;
   }
+  
   // Altrimenti serve la pagina client
+  console.log('[HTTP] Servendo pagina client');
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -103,6 +116,7 @@ const bgWss = new ws.Server({ noServer: true });
 const adminWss = new ws.Server({ noServer: true });
 
 const clients = new Map(); // room → ws
+let frameCount = 0;
 
 bgWss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
