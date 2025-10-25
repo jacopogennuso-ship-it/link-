@@ -39,22 +39,35 @@ const adminHtml = `
 
     ws.onmessage = (e) => {
       try {
-        const { room, timestamp } = JSON.parse(e.data);
-        if (!rooms.has(room)) {
-          const div = document.createElement('div');
-          div.className = 'cam';
-          div.innerHTML = \`
-            <h2>\${room}</h2>
-            <img id="img-\${room}">
-            <div class="status" id="status-\${room}">Online</div>
-          \`;
-          grid.appendChild(div);
-          rooms.set(room, div);
+        if (e.data instanceof Blob) {
+          // Gestisce il blob dell'immagine
+          const lastRoom = localStorage.getItem('lastRoom');
+          if (lastRoom) {
+            const img = document.getElementById('img-' + lastRoom);
+            if (img) {
+              img.src = URL.createObjectURL(e.data);
+              document.getElementById('status-' + lastRoom).textContent = 'Live';
+            }
+          }
+        } else {
+          // Gestisce i metadati (room, timestamp)
+          const { room, timestamp } = JSON.parse(e.data);
+          localStorage.setItem('lastRoom', room);
+          if (!rooms.has(room)) {
+            const div = document.createElement('div');
+            div.className = 'cam';
+            div.innerHTML = \`
+              <h2>\${room}</h2>
+              <img id="img-\${room}">
+              <div class="status" id="status-\${room}">Online</div>
+            \`;
+            grid.appendChild(div);
+            rooms.set(room, div);
+          }
         }
-        const img = document.getElementById('img-' + room);
-        img.src = URL.createObjectURL(e.data.blob || e.data);
-        document.getElementById('status-' + room).textContent = 'Live';
-      } catch(err) {}
+      } catch(err) {
+        console.error('Error processing message:', err);
+      }
     };
   </script>
 </body></html>
