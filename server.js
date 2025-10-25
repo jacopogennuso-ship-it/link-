@@ -1,65 +1,83 @@
 const express = require('express');
+const ws = require('ws');
 const path = require('path');
-const { WebSocketServer } = require('ws');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Pagine
+// Serve client
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// Admin protetto
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
+// WebSocket servers
+const bgWss = new ws.Server({ noServer: true });     // camere
+const adminWss = new ws.Server({ noServer: true });  // dashboard
 
-// WebSocket signaling
-const wss = new WebSocketServer({ noServer: true });
+const clients = new Map(); // room → ws
 
-// Map room -> {client: ws, admins: Set<ws>}
-const rooms = new Map();
-
-server.on('upgrade', (req, socket, head) => {
+// Client camere
+bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/signal') {
-    wss.handleUpgrade(req, socket, head, ws => {
-      ws.on('message', msg => handleMessage(ws, msg));
-      ws.on('close', () => handleClose(ws));
-    });
-  } else socket.destroy();
+  const room = url.searchParams.get('room') || 'unknown';
+  console.log(`📷 Camera connessa: ${room}`);
+  clients.set(room, socket);
+
+  socket.on('message', (data) => {
+    if (typeof data === 'string') {
+      try {
+        const msg = JSON.parse(data);
+        // Comando da admin per cambiare fotocamera
+        if (msg.type === 'switchCamera') {
+          // Invia comando al client
+          if (clients.has(room)) clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
+          return;
+        }
+        if (data === 'ping') return;
+      } catch (err) {
+        // non JSON, probabilmente frame
+      }
+    }
+
+    const metadata = JSON.stringify({ room, timestamp: Date.now() });
+
+    // Invia a tutti gli admin
+    for (const admin of adminWss.clients) {
+      if (admin.readyState === ws.OPEN) {
+        try {
+          admin.send(metadata);
+          if (data instanceof Buffer) admin.send(data, { binary: true });
+        } catch (err) { console.error('Errore invio frame:', err); }
+      }
+    }
+  });
+
+  socket.on('close', () => {
+    clients.delete(room);
+    console.log(`❌ Camera disconnessa: ${room}`);
+    for (const admin of adminWss.clients) {
+      if (admin.readyState === ws.OPEN) admin.send(JSON.stringify({ room, offline: true }));
+    }
+  });
 });
 
-function handleMessage(ws, msg) {
-  let data;
-  try { data = JSON.parse(msg); } catch { return; }
+// Admin dashboard
+adminWss.on('connection', (socket) => {
+  console.log('🖥️ Admin collegato');
+  socket.send(JSON.stringify({ type: 'welcome' }));
+});
 
-  if (data.type === 'register') {
-    ws.role = data.role;
-    ws.room = data.room || 'default';
-    if (!rooms.has(ws.room)) rooms.set(ws.room, { client: null, admins: new Set() });
-    const r = rooms.get(ws.room);
-    if (ws.role === 'client') r.client = ws;
-    else r.admins.add(ws);
-  } else if (data.type === 'offer' || data.type === 'answer' || data.type === 'ice') {
-    const r = rooms.get(ws.room);
-    if (!r) return;
-    if (ws.role === 'client') {
-      r.admins.forEach(admin => { if (admin.readyState === 1) admin.send(JSON.stringify(data)); });
-    } else {
-      if (r.client && r.client.readyState === 1) r.client.send(JSON.stringify(data));
-    }
-  } else if (data.type === 'switchCamera') {
-    const r = rooms.get(ws.room);
-    if (r?.client && r.client.readyState === 1) {
-      r.client.send(JSON.stringify({ type: 'switchCamera', camera: data.camera }));
-    }
-  }
-}
+// Avvio server
+const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
 
-function handleClose(ws) {
-  const r = rooms.get(ws.room);
-  if (!r) return;
-  if (ws.role === 'client') r.client = null;
-  else r.admins.delete(ws);
-}
+// Gestione upgrade WebSocket
+server.on('upgrade', (req, socket, head) => {
+  const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
+  if (pathname === '/bg-stream') bgWss.handleUpgrade(req, socket, head, ws => bgWss.emit('connection', ws, req));
+  else if (pathname === '/bg-admin') adminWss.handleUpgrade(req, socket, head, ws => adminWss.emit('connection', ws, req));
+  else socket.destroy();
+});

