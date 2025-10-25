@@ -6,13 +6,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <style>
 body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:15px; }
-.cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position:relative; }
-.cam img, .cam audio { width:100%; display:block; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:15px; }
+.cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position:relative; padding-bottom:40px; }
+.cam img, .cam audio { width:100%; display:block; margin-bottom:5px; }
 h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
-.status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.7); }
-.controls { margin-top:5px; text-align:center; }
-.controls button { background:#0f0; color:#000; border:none; padding:5px 10px; cursor:pointer; border-radius:4px; font-size:12px; }
+.status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:35px; left:0; right:0; background:rgba(0,0,0,0.7); }
+.controls { position:absolute; bottom:0; left:0; width:100%; text-align:center; padding:5px; background:rgba(0,0,0,0.9); }
+.controls button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 5px; cursor:pointer; border-radius:6px; font-weight:bold; font-size:14px; }
 </style>
 </head>
 <body>
@@ -35,4 +35,12 @@ ws.onmessage = e => {
   if (e.data instanceof Blob) {
     const currentRoom = localStorage.getItem('currentRoom');
     if (!currentRoom) return;
-    const room
+    const roomData = rooms.get(currentRoom);
+    if (!roomData || !roomData.img) return;
+    if (Date.now() - lastUpdate < 50) return; // 20 FPS circa
+    const oldUrl = imageCache.get(currentRoom);
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    const newUrl = URL.createObjectURL(e.data);
+    roomData.img.src = newUrl;
+    imageCache.set(currentRoom, newUrl);
+    const statusEl = document.getElementById('status

@@ -15,12 +15,11 @@ app.get('/admin', (req, res) => {
 });
 
 // WebSocket servers
-const bgWss = new ws.Server({ noServer: true });     // camere
-const adminWss = new ws.Server({ noServer: true });  // dashboard
+const bgWss = new ws.Server({ noServer: true });
+const adminWss = new ws.Server({ noServer: true });
 
 const clients = new Map(); // room → ws
 
-// Client camere
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
@@ -60,16 +59,13 @@ bgWss.on('connection', (socket, req) => {
   });
 });
 
-// Admin dashboard
 adminWss.on('connection', (socket) => {
   console.log('🖥️ Admin collegato');
   socket.send(JSON.stringify({ type: 'welcome' }));
 });
 
-// Avvio server
 const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
 
-// Gestione upgrade WebSocket
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
   if (pathname === '/bg-stream') bgWss.handleUpgrade(req, socket, head, ws => bgWss.emit('connection', ws, req));
