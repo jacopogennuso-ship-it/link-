@@ -28,26 +28,44 @@ const adminHtml = `
   img { width:100%; height:auto; display:block; }
   h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
   .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
+  .debug { position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.8); color:#0f0; padding:10px; font-size:12px; max-height:100px; overflow-y:auto; }
 </style></head>
 <body>
   <h1>Camera in Background</h1>
   <div id="grid" class="grid"></div>
+  <div id="debug" class="debug"></div>
   <script>
     const grid = document.getElementById('grid');
+    const debug = document.getElementById('debug');
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
+    
+    function log(msg) {
+      const div = document.createElement('div');
+      div.textContent = new Date().toISOString() + ': ' + msg;
+      debug.appendChild(div);
+      if (debug.children.length > 20) debug.removeChild(debug.firstChild);
+    }
 
+    ws.onopen = () => log('WebSocket connesso');
+
+    let lastRoom = null;
+    
     ws.onmessage = (e) => {
       try {
         // Se è una stringa, è un messaggio di controllo
         if (typeof e.data === 'string') {
           const data = JSON.parse(e.data);
+          log('Ricevuto messaggio: ' + JSON.stringify(data));
+          
           if (data.offline) {
             const statusEl = document.getElementById('status-' + data.room);
             if (statusEl) statusEl.textContent = 'Offline';
             return;
           }
-          if (!data.room) return; // Ignora altri messaggi di controllo
+          
+          if (!data.room) return;
+          lastRoom = data.room;
           
           if (!rooms.has(data.room)) {
             const div = document.createElement('div');
@@ -59,27 +77,41 @@ const adminHtml = `
             \`;
             grid.appendChild(div);
             rooms.set(data.room, div);
+            log('Nuova stanza creata: ' + data.room);
           }
           document.getElementById('status-' + data.room).textContent = 'Live';
         } 
         // Se è un Blob, è un frame video
         else if (e.data instanceof Blob) {
-          const msgBefore = e.lastMessageEvent?.data;
-          if (typeof msgBefore === 'string') {
-            try {
-              const { room } = JSON.parse(msgBefore);
-              if (room) {
-                const img = document.getElementById('img-' + room);
-                if (img) {
-                  const url = URL.createObjectURL(e.data);
-                  img.onload = () => URL.revokeObjectURL(img.src);
-                  img.src = url;
-                }
+          log('Ricevuto blob: ' + e.data.size + ' bytes');
+          if (lastRoom) {
+            const img = document.getElementById('img-' + lastRoom);
+            if (img) {
+              // Creiamo un URL dal blob
+              const url = URL.createObjectURL(e.data);
+              // Aggiorniamo il timestamp per debug
+              const statusEl = document.getElementById('status-' + lastRoom);
+              if (statusEl) {
+                statusEl.textContent = 'Live - Frame: ' + new Date().toLocaleTimeString();
               }
-            } catch(err) {}
+              // Pulisci la vecchia URL quando l'immagine è caricata
+              img.onload = () => {
+                URL.revokeObjectURL(img.src);
+                log('Frame mostrato per ' + lastRoom);
+              };
+              img.onerror = (err) => {
+                log('Errore caricamento frame: ' + err);
+              };
+              img.src = url;
+            } else {
+              log('Elemento img non trovato per ' + lastRoom);
+            }
+          } else {
+            log('Ricevuto blob ma nessuna stanza attiva');
           }
         }
       } catch(err) {
+        log('Errore: ' + err.message);
         console.error('Error processing message:', err);
       }
     };
@@ -105,21 +137,38 @@ bgWss.on('connection', (ws, req) => {
 
   clients.set(room, ws);
 
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
     // Invia a tutti gli admin
-    adminWss.clients.forEach(client => {
+    adminWss.clients.forEach(async (client) => {
       if (client.readyState === ws.OPEN) {
-        // Prima invia info sulla stanza
-        client.send(JSON.stringify({ 
-          room, 
-          timestamp: Date.now() 
-        }));
-        
-        // Poi invia il frame video
-        if (data instanceof Buffer || data instanceof Blob) {
-          client.send(data, { binary: true });
+        try {
+          // Prima invia info sulla stanza
+          await new Promise((resolve, reject) => {
+            client.send(JSON.stringify({ 
+              room, 
+              timestamp: Date.now() 
+            }), (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          
+          // Piccola pausa per assicurarsi che il messaggio di controllo arrivi prima
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Poi invia il frame video
+          if (Buffer.isBuffer(data) || data instanceof Blob) {
+            await new Promise((resolve, reject) => {
+              client.send(data, { binary: true }, (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+          }
+        } catch (err) {
+          console.error('Errore invio a client:', err);
         }
       }
     });

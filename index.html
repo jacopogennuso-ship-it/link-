@@ -40,9 +40,10 @@
       ctx.drawImage(video, 0, 0);
       canvas.toBlob(blob => {
         if (ws.readyState === WebSocket.OPEN && blob) {
+          console.log('Invio frame:', blob.size, 'bytes');
           ws.send(blob);
         }
-      }, 'image/jpeg', 0.6);
+      }, 'image/jpeg', 0.5); // Ridotta qualità per migliorare performance
       setTimeout(sendFrame, 150);
     }
 
