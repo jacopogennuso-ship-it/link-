@@ -20,15 +20,15 @@ video { width:100%; display:block; }
 <div id="grid" class="grid"></div>
 
 <script>
-const grid = document.getElementById('grid');
-const ws = new WebSocket(`wss://${location.host}/bg-admin`);
-const rooms = new Map();
-const mediaStreams = new Map();
+const grid=document.getElementById('grid');
+const ws=new WebSocket(`wss://${location.host}/bg-admin`);
+const rooms=new Map();
+const mediaStreams=new Map();
 
-ws.onmessage = async e=>{
+ws.onmessage=e=>{
   if(typeof e.data==='string'){
     try{
-      const msg = JSON.parse(e.data);
+      const msg=JSON.parse(e.data);
       if(msg.room){
         if(!rooms.has(msg.room)){
           const div=document.createElement('div'); div.className='cam';
@@ -60,21 +60,20 @@ ws.onmessage = async e=>{
       }
     }catch(err){ console.error(err);}
   }else if(e.data instanceof Blob){
-    // Trova ultimo room attiva
     rooms.forEach((v,k)=>appendChunk(k,e.data));
   }
 };
 
 function appendChunk(room,blob){
-  const streamData=mediaStreams.get(room);
-  if(!streamData || !streamData.sourceBuffer) return;
-  streamData.queue.push(blob);
+  const s=mediaStreams.get(room);
+  if(!s||!s.sourceBuffer) return;
+  s.queue.push(blob);
   processQueue(room);
 }
 
 function processQueue(room){
   const s=mediaStreams.get(room);
-  if(!s || !s.sourceBuffer || s.sourceBuffer.updating || s.queue.length===0) return;
+  if(!s||!s.sourceBuffer||s.sourceBuffer.updating||s.queue.length===0) return;
   const chunk=s.queue.shift();
   const reader=new FileReader();
   reader.onload=e=>{
@@ -84,7 +83,7 @@ function processQueue(room){
 }
 
 function switchCam(room,camera){
-  if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'switchCamera',camera,camera}));
+  if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'switchCamera',camera}));
 }
 </script>
 </body>

