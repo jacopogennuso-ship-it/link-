@@ -32,7 +32,7 @@ bgWss.on('connection', (socket, req) => {
           return;
         }
         if (data === 'ping') return;
-      } catch {}
+      } catch{}
     }
 
     // Invia a tutti gli admin

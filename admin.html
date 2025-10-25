@@ -33,7 +33,6 @@ ws.onmessage = async e => {
       const data = JSON.parse(e.data);
       const room = data.room;
       if (!rooms.has(room)) {
-        // Crea container
         const div = document.createElement('div');
         div.className = 'cam';
         div.innerHTML = `
@@ -68,27 +67,6 @@ ws.onmessage = async e => {
   } else {
     // Chunk WebM
     const arrayBuffer = await e.data.arrayBuffer();
-    const room = Array.from(mediaStreams.keys())[0]; // semplice: primo room
+    const room = Array.from(mediaStreams.keys())[0]; 
     const streamObj = mediaStreams.get(room);
-    if (streamObj && streamObj.sourceBuffer && !streamObj.sourceBuffer.updating) {
-      streamObj.queue.push(arrayBuffer);
-      processQueue(room);
-    }
-  }
-};
-
-function processQueue(room){
-  const streamObj = mediaStreams.get(room);
-  if(!streamObj || !streamObj.sourceBuffer || streamObj.queue.length===0 || streamObj.sourceBuffer.updating) return;
-  const chunk = streamObj.queue.shift();
-  try { streamObj.sourceBuffer.appendBuffer(chunk); } catch(e){ console.error(e); }
-}
-
-function switchCamera(room,camera){
-  const clientWs = new WebSocket(`${protocol}://${location.host}/bg-admin`);
-  clientWs.onopen = ()=> clientWs.send(JSON.stringify({type:'switchCamera',camera}));
-  alert(`Inviato comando cambio fotocamera: ${camera}`);
-}
-</script>
-</body>
-</html>
+    if (streamObj && streamObj
