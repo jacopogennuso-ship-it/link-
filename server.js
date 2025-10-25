@@ -9,12 +9,35 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Mappa per tenere traccia delle preferenze della fotocamera per ogni stanza
+const cameraPreferences = new Map(); // room -> 'user' | 'environment'
+
 // Dashboard admin con password
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') {
     return res.status(403).send('Accesso negato');
   }
   res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// API per cambiare la fotocamera
+app.post('/api/switch-camera', (req, res) => {
+  const { room } = req.query;
+  if (!room) {
+    return res.status(400).json({ error: 'Room parameter required' });
+  }
+
+  const currentMode = cameraPreferences.get(room) || 'environment';
+  const newMode = currentMode === 'environment' ? 'user' : 'environment';
+  cameraPreferences.set(room, newMode);
+
+  // Notifica il client del cambio
+  const client = clients.get(room);
+  if (client && client.readyState === ws.OPEN) {
+    client.send(JSON.stringify({ type: 'switch-camera', mode: newMode }));
+  }
+
+  res.json({ success: true, mode: newMode });
 });
 
 // === ADMIN DASHBOARD (admin.html) ===
