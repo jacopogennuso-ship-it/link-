@@ -81,6 +81,12 @@ const adminHtml = `
       if (typeof e.data === 'string') {
         try {
           const meta = JSON.parse(e.data);
+          // Verifica che meta.room esista prima di usarlo
+          if (!meta.room) {
+            console.error('[ADMIN] Meta ricevuto senza room:', meta);
+            return;
+          }
+          
           if (meta.offline) {
             if (rooms.has(meta.room)) {
               document.getElementById('status-' + meta.room).textContent = 'Offline';
@@ -90,7 +96,7 @@ const adminHtml = `
             return;
           }
           currentRoom = meta.room;
-          console.log('[ADMIN] Ricevuto meta per', currentRoom);
+          console.log('[ADMIN] Ricevuto meta per', currentRoom, meta);
         } catch (err) {
           console.error('[ADMIN] Errore parsing meta:', err);
         }
@@ -171,7 +177,11 @@ bgWss.on('connection', (ws, req) => {
     // Invia a tutti gli admin
     adminWss.clients.forEach(client => {
       if (client.readyState === ws.OPEN) {
-        client.send(msg, { binary: true });
+        // Prima invia i metadati come stringa
+        client.send(msg);
+        console.log('[SERVER] Inviato metadati a admin:', msg);
+        
+        // Poi invia il frame video
         if (data instanceof Blob || data.byteLength) {
           client.send(data);
           console.log('[SERVER] Inviato frame a admin per', room);
