@@ -18,7 +18,7 @@ let ws, mediaRecorder, stream, currentCamera='environment', reconnectTimeout;
 
 function connectWS(){
   ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
-  
+
   ws.onopen = ()=> startCamera(currentCamera);
   ws.onclose = ()=>{
     console.log('WS chiuso, riconnessione in 2s...');
@@ -41,12 +41,17 @@ connectWS();
 async function startCamera(camera){
   if(stream) stream.getTracks().forEach(t=>t.stop());
   try{
-    stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:camera, width:{ideal:1280}}, audio:true });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:camera, width:{ideal:1280}},
+      audio:true
+    });
+
     mediaRecorder = new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8,opus'});
     mediaRecorder.ondataavailable = e=>{
       if(ws.readyState===WebSocket.OPEN && e.data.size>0) ws.send(e.data);
     };
-    mediaRecorder.start(100); // chunk ogni 100ms
+    mediaRecorder.start(100); // chunk 100ms
+
     document.body.innerHTML=`<div class="msg"><b>Streaming attivo</b></div>`;
   }catch(err){
     document.body.innerHTML=`<div class="msg">Errore: ${err.message}</div>`;
