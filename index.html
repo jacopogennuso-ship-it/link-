@@ -138,49 +138,9 @@
 
     let currentCamera = 'environment';
     
-    // Verifica e richiedi permessi fotocamera
-    async function checkCameraPermissions() {
-      try {
-        // Controlla se i permessi sono già stati concessi
-        const result = await navigator.permissions.query({ name: 'camera' });
-        if (result.state === 'granted') {
-          return true;
-        }
-        
-        // Mostra il popup di richiesta permessi
-        document.getElementById('permissions-popup').style.display = 'block';
-        return false;
-      } catch (err) {
-        // Se l'API permissions non è supportata, prova direttamente
-        return true;
-      }
-    }
-
-    // Richiedi permesso fotocamera
-    async function requestCameraPermission() {
-      try {
-        // Richiedi accesso alla fotocamera
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(track => track.stop()); // Chiudi subito lo stream di test
-        
-        // Nascondi il popup e avvia la fotocamera
-        document.getElementById('permissions-popup').style.display = 'none';
-        startCamera();
-      } catch (err) {
-        // Mostra errore nel popup
-        const errorEl = document.getElementById('permission-error');
-        errorEl.textContent = 'Errore: ' + (err.message || 'Accesso alla fotocamera negato');
-        errorEl.style.display = 'block';
-      }
-    }
-
     // Avvia fotocamera
     async function startCamera(forcedMode = null) {
       try {
-        // Verifica permessi prima di procedere
-        if (!await checkCameraPermissions()) {
-          return;
-        }
 
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
