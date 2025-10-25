@@ -12,20 +12,121 @@ app.use((req, res, next) => {
   next();
 });
 
-// Gestione route principale e admin
+// Route principale
 app.get('/', (req, res) => {
   console.log('[HTTP] Richiesta pagina, query:', req.query);
-  
-  // Se c'è il parametro admin, serve la pagina admin
   if (req.query.admin) {
     console.log('[HTTP] Servendo pagina admin');
     res.sendFile(path.join(__dirname, 'admin.html'));
     return;
   }
-  
-  // Altrimenti serve la pagina client
   console.log('[HTTP] Servendo pagina client');
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Serve static files
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// WebSocket servers
+const bgWss = new WebSocket.Server({ noServer: true });
+const adminWss = new WebSocket.Server({ noServer: true });
+
+// Client connections map
+const clients = new Map(); // room → ws
+
+// Handle client connections
+bgWss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'http://' + req.headers.host);
+  const room = url.searchParams.get('room') || 'unknown';
+
+  clients.set(room, ws);
+  console.log('[WS] Client connesso, room:', room);
+
+  ws.on('message', (data) => {
+    if (typeof data === 'string' && data === 'ping') return;
+
+    if (typeof data === 'string') {
+      console.log('[SERVER] Messaggio da', room + ':', data);
+    } else {
+      console.log('[SERVER] Frame video da', room + ':', data?.byteLength || data?.size || '?', 'bytes');
+    }
+
+    const msg = JSON.stringify({ room, timestamp: Date.now() });
+
+    // Broadcast to all admins
+    adminWss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(msg);
+        if (data instanceof Blob || data.byteLength) {
+          client.send(data);
+        }
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    clients.delete(room);
+    console.log('[WS] Client disconnesso:', room);
+    adminWss.clients.forEach(c => {
+      if (c.readyState === WebSocket.OPEN) {
+        c.send(JSON.stringify({ room, offline: true }));
+      }
+    });
+  });
+});
+
+// Handle admin connections
+adminWss.on('connection', (ws) => {
+  console.log('[WS] Admin connesso');
+  ws.send(JSON.stringify({ type: 'welcome' }));
+
+  ws.on('message', (msg) => {
+    try {
+      const cmd = JSON.parse(msg);
+      if (cmd.type === 'camera' && cmd.room && cmd.mode) {
+        const client = clients.get(cmd.room);
+        if (client && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'camera', mode: cmd.mode }));
+          console.log('[WS] Comando camera inviato a', cmd.room + ':', cmd.mode);
+        }
+      }
+    } catch (err) {
+      console.error('[WS] Errore parsing comando:', err);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('[WS] Admin disconnesso');
+  });
+});
+
+// Handle WebSocket upgrade
+const server = app.listen(PORT, () => {
+  console.log(`[SERVER] Avviato su http://localhost:${PORT}`);
+});
+
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const url = new URL(req.url, 'http://' + req.headers.host);
+    const pathname = url.pathname;
+
+    if (pathname === '/bg-stream') {
+      bgWss.handleUpgrade(req, socket, head, ws => {
+        bgWss.emit('connection', ws, req);
+      });
+    } else if (pathname === '/bg-admin') {
+      adminWss.handleUpgrade(req, socket, head, ws => {
+        adminWss.emit('connection', ws, req);
+      });
+    } else {
+      socket.destroy();
+    }
+  } catch (err) {
+    console.error('[WS] Errore upgrade:', err);
+    socket.destroy();
+  }
 });
 
 app.get('/admin.html', (req, res) => {
