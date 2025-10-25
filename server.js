@@ -1,5 +1,5 @@
 const express = require('express');
-const ws = require('ws');
+const WebSocket = require('ws');
 const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,7 +33,7 @@ app.post('/api/switch-camera', (req, res) => {
 
   // Notifica il client del cambio
   const client = clients.get(room);
-  if (client && client.readyState === ws.OPEN) {
+  if (client && client.readyState === WebSocket.OPEN) {
     client.send(JSON.stringify({ type: 'switch-camera', mode: newMode }), (err) => {
       if (err) {
         console.error('Errore invio comando switch camera:', err);
@@ -216,23 +216,23 @@ fs.writeFileSync('admin.html', adminHtml);
 app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
 // === WEBSOCKET: Streaming in background ===
-const bgWss = new ws.Server({ noServer: true });
-const adminWss = new ws.Server({ noServer: true });
+const bgWss = new WebSocket.Server({ noServer: true });
+const adminWss = new WebSocket.Server({ noServer: true });
 
 const clients = new Map(); // room → ws
 
-bgWss.on('connection', (ws, req) => {
+bgWss.on('connection', (conn, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
 
-  clients.set(room, ws);
+  clients.set(room, conn);
 
-  ws.on('message', async (data) => {
+  conn.on('message', async (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
     // Invia a tutti gli admin
     adminWss.clients.forEach(async (client) => {
-      if (client.readyState === ws.OPEN) {
+      if (client.readyState === WebSocket.OPEN) {
         try {
           // Prima invia info sulla stanza
           await new Promise((resolve, reject) => {
@@ -264,11 +264,11 @@ bgWss.on('connection', (ws, req) => {
     });
   });
 
-  ws.on('close', () => {
+  conn.on('close', () => {
     clients.delete(room);
     // Notifica admin che è offline
     adminWss.clients.forEach(c => {
-      if (c.readyState === ws.OPEN) {
+      if (c.readyState === WebSocket.OPEN) {
         c.send(JSON.stringify({ room, offline: true }));
       }
     });
