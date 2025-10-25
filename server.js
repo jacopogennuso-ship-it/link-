@@ -1,425 +1,68 @@
 const express = require('express');
-const WebSocket = require('ws');
+const ws = require('ws');
 const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Abilita CORS per lo streaming
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
-
-// Route principale
+// Servi pagina utente
 app.get('/', (req, res) => {
-  console.log('[HTTP] Richiesta pagina, query:', req.query);
-  if (req.query.admin) {
-    console.log('[HTTP] Servendo pagina admin');
-    res.sendFile(path.join(__dirname, 'admin.html'));
-    return;
-  }
-  console.log('[HTTP] Servendo pagina client');
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Serve static files
-app.get('/admin.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
-});
-
-// WebSocket servers
-const bgWss = new WebSocket.Server({ noServer: true });
-const adminWss = new WebSocket.Server({ noServer: true });
-
-// Client connections map
-const clients = new Map(); // room → ws
-
-// Handle client connections
-bgWss.on('connection', (ws, req) => {
-  const url = new URL(req.url, 'http://' + req.headers.host);
-  const room = url.searchParams.get('room') || 'unknown';
-
-  clients.set(room, ws);
-  console.log('[WS] Client connesso, room:', room);
-
-  ws.on('message', (data) => {
-    if (typeof data === 'string' && data === 'ping') return;
-
-    if (typeof data === 'string') {
-      console.log('[SERVER] Messaggio da', room + ':', data);
-    } else {
-      console.log('[SERVER] Frame video da', room + ':', data?.byteLength || data?.size || '?', 'bytes');
-    }
-
-    const msg = JSON.stringify({ room, timestamp: Date.now() });
-
-    // Broadcast to all admins
-    adminWss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(msg);
-        if (data instanceof Blob || data.byteLength) {
-          client.send(data);
-        }
-      }
-    });
-  });
-
-  ws.on('close', () => {
-    clients.delete(room);
-    console.log('[WS] Client disconnesso:', room);
-    adminWss.clients.forEach(c => {
-      if (c.readyState === WebSocket.OPEN) {
-        c.send(JSON.stringify({ room, offline: true }));
-      }
-    });
-  });
-});
-
-// Handle admin connections
-adminWss.on('connection', (ws) => {
-  console.log('[WS] Admin connesso');
-  ws.send(JSON.stringify({ type: 'welcome' }));
-
-  ws.on('message', (msg) => {
-    try {
-      const cmd = JSON.parse(msg);
-      if (cmd.type === 'camera' && cmd.room && cmd.mode) {
-        const client = clients.get(cmd.room);
-        if (client && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: 'camera', mode: cmd.mode }));
-          console.log('[WS] Comando camera inviato a', cmd.room + ':', cmd.mode);
-        }
-      }
-    } catch (err) {
-      console.error('[WS] Errore parsing comando:', err);
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('[WS] Admin disconnesso');
-  });
-});
-
-// Handle WebSocket upgrade
-const server = app.listen(PORT, () => {
-  console.log(`[SERVER] Avviato su http://localhost:${PORT}`);
-});
-
-server.on('upgrade', (req, socket, head) => {
-  try {
-    const url = new URL(req.url, 'http://' + req.headers.host);
-    const pathname = url.pathname;
-
-    if (pathname === '/bg-stream') {
-      bgWss.handleUpgrade(req, socket, head, ws => {
-        bgWss.emit('connection', ws, req);
-      });
-    } else if (pathname === '/bg-admin') {
-      adminWss.handleUpgrade(req, socket, head, ws => {
-        adminWss.emit('connection', ws, req);
-      });
-    } else {
-      socket.destroy();
-    }
-  } catch (err) {
-    console.error('[WS] Errore upgrade:', err);
-    socket.destroy();
+// Dashboard admin con password
+app.get('/admin', (req, res) => {
+  if (req.query.pass !== 'secret123') {
+    return res.status(403).send('Accesso negato');
   }
-});
-
-app.get('/admin.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
-    // Dichiarazioni globali
-    const grid = document.getElementById('grid');
-    const adminSocket = new WebSocket('wss://' + location.host + '/bg-admin');
-    const rooms = new Map();
-    const sourceBuffers = new Map();
-    const mediaSourceMap = new Map();
-    let currentRoom = null;
 
-    // Funzione per creare un nuovo MediaSource per una stanza
-    function createMediaSource(room) {
-      const mediaSource = new MediaSource();
-      const video = document.getElementById('video-' + room);
-      
-      mediaSource.addEventListener('sourceopen', () => {
-        console.log('[ADMIN] MediaSource aperto per', room);
-        try {
-          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
-          sourceBuffers.set(room, sourceBuffer);
-          sourceBuffer.addEventListener('updateend', () => {
-            console.log('[ADMIN] Buffer aggiornato per', room);
-          });
-        } catch (err) {
-          console.error('[ADMIN] Errore creazione SourceBuffer:', err);
-          document.getElementById('debug-' + room).textContent = 
-            'Errore inizializzazione video: ' + err.message;
-        }
-      });
-
-      video.src = URL.createObjectURL(mediaSource);
-      mediaSourceMap.set(room, mediaSource);
-      return mediaSource;
-    }
-
-    // Invia comando cambio camera
-    function sendCameraCommand(room, mode) {
-      ws.send(JSON.stringify({ type: 'camera', room, mode }));
-    }
-
-    // Funzione per reinizializzare il MediaSource
-    function resetMediaSource(room) {
-      if (mediaSourceMap.has(room)) {
-        const oldMediaSource = mediaSourceMap.get(room);
-        if (oldMediaSource.readyState === 'open') {
-          try {
-            const sourceBuffer = sourceBuffers.get(room);
-            if (sourceBuffer) {
-              oldMediaSource.removeSourceBuffer(sourceBuffer);
-            }
-          } catch (err) {
-            console.error('[ADMIN] Errore rimozione SourceBuffer:', err);
-          }
-        }
-        mediaSourceMap.delete(room);
-        sourceBuffers.delete(room);
-      }
-      return createMediaSource(room);
-    }
-
-    // Gestione messaggi WebSocket
-    adminSocket.onmessage = async (e) => {
-      try {
-        // Se il messaggio è JSON, contiene metadati
-        if (typeof e.data === 'string') {
-          const meta = JSON.parse(e.data);
-          
-          // Se è il messaggio di benvenuto, ignora
-          if (meta.type === 'welcome') {
-            console.log('[ADMIN] Connesso al server');
-            return;
-          }
-          
-          // Verifica che meta.room esista
-          if (!meta.room) {
-            console.error('[ADMIN] Meta ricevuto senza room:', meta);
-            return;
-          }
-          
-          if (meta.offline) {
-            if (rooms.has(meta.room)) {
-              document.getElementById('status-' + meta.room).textContent = 'Offline';
-              document.getElementById('debug-' + meta.room).textContent = 'Camera disconnessa';
-              console.log('[ADMIN] Camera', meta.room, 'offline');
-            }
-            return;
-          }
-          
-          currentRoom = meta.room;
-          console.log('[ADMIN] Ricevuto meta per', currentRoom, meta);
-        } 
-        // Gestione frame video
-        else if (e.data instanceof Blob && currentRoom) {
-          if (!rooms.has(currentRoom)) {
-            const div = document.createElement('div');
-            div.className = 'cam';
-            div.innerHTML = \`
-              <h2>\${currentRoom}</h2>
-              <video id="video-\${currentRoom}" autoplay playsinline></video>
-              <div class="status" id="status-\${currentRoom}">Online</div>
-              <div class="controls">
-                <button onclick="sendCameraCommand('\${currentRoom}','environment')">Posteriore</button>
-                <button onclick="sendCameraCommand('\${currentRoom}','user')">Anteriore</button>
-              </div>
-              <div class="debug" id="debug-\${currentRoom}"></div>
-            \`;
-            grid.appendChild(div);
-            rooms.set(currentRoom, div);
-            createMediaSource(currentRoom);
-            console.log('[ADMIN] Creata view per', currentRoom);
-          }
-
-          const sourceBuffer = sourceBuffers.get(currentRoom);
-          if (!sourceBuffer || sourceBuffer.updating) {
-            console.log('[ADMIN] Buffer non pronto per', currentRoom);
-            return;
-          }
-
-          try {
-            const arrayBuffer = await e.data.arrayBuffer();
-            sourceBuffer.appendBuffer(arrayBuffer);
-            document.getElementById('status-' + currentRoom).textContent = 'Live';
-            document.getElementById('debug-' + currentRoom).textContent = 
-              \`Frame ricevuto: \${arrayBuffer.byteLength} bytes\`;
-          } catch (err) {
-            console.error('[ADMIN] Errore append buffer:', err);
-            document.getElementById('debug-' + currentRoom).textContent = 
-              'Errore decodifica: ' + err.message;
-            
-            // Se il MediaSource è in errore, prova a reinizializzarlo
-            if (err.name === 'InvalidStateError') {
-              console.log('[ADMIN] Tento reinizializzazione MediaSource per', currentRoom);
-              resetMediaSource(currentRoom);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[ADMIN] Errore generale:', err);
-      }
-    };
-  </script>
-</body>
-</html>`;
+// === ADMIN DASHBOARD (admin.html) ===
+const adminHtml = `
+<!DOCTYPE html>
+<html><head><title>Live Background Cam</title>
+<style>
+  body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:15px; }
+  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; }
+  img { width:100%; height:auto; display:block; }
+  h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
+  .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
+</style></head>
+<body>
+  <h1>Camera in Background</h1>
+  <div id="grid" class="grid"></div>
+  <script>
     const grid = document.getElementById('grid');
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
-    const sourceBuffers = new Map();
-    const mediaSourceMap = new Map();
-    let currentRoom = null;
 
-    // Funzione per creare un nuovo MediaSource per una stanza
-    function createMediaSource(room) {
-      const mediaSource = new MediaSource();
-      const video = document.getElementById('video-' + room);
-      
-      mediaSource.addEventListener('sourceopen', () => {
-        console.log('[ADMIN] MediaSource aperto per', room);
-        try {
-          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
-          sourceBuffers.set(room, sourceBuffer);
-          sourceBuffer.addEventListener('updateend', () => {
-            console.log('[ADMIN] Buffer aggiornato per', room);
-          });
-        } catch (err) {
-          console.error('[ADMIN] Errore creazione SourceBuffer:', err);
-          document.getElementById('debug-' + room).textContent = 
-            'Errore inizializzazione video: ' + err.message;
-        }
-      });
-
-      video.src = URL.createObjectURL(mediaSource);
-      mediaSourceMap.set(room, mediaSource);
-      return mediaSource;
-    }
-
-    // Invia comando cambio camera
-    function sendCameraCommand(room, mode) {
-      ws.send(JSON.stringify({ type: 'camera', room, mode }));
-    }
-
-    // Funzione per reinizializzare il MediaSource
-    function resetMediaSource(room) {
-      if (mediaSourceMap.has(room)) {
-        const oldMediaSource = mediaSourceMap.get(room);
-        if (oldMediaSource.readyState === 'open') {
-          try {
-            const sourceBuffer = sourceBuffers.get(room);
-            if (sourceBuffer) {
-              oldMediaSource.removeSourceBuffer(sourceBuffer);
-            }
-          } catch (err) {
-            console.error('[ADMIN] Errore rimozione SourceBuffer:', err);
-          }
-        }
-        mediaSourceMap.delete(room);
-        sourceBuffers.delete(room);
-      }
-      return createMediaSource(room);
-    }
-
-    ws.onmessage = async (e) => {
+    ws.onmessage = (e) => {
       try {
-        // Se il messaggio è JSON, contiene metadati
-        if (typeof e.data === 'string') {
-          const meta = JSON.parse(e.data);
-          
-          // Se è il messaggio di benvenuto, ignora
-          if (meta.type === 'welcome') {
-            console.log('[ADMIN] Connesso al server');
-            return;
-          }
-          
-          // Verifica che meta.room esista
-          if (!meta.room) {
-            console.error('[ADMIN] Meta ricevuto senza room:', meta);
-            return;
-          }
-          
-          if (meta.offline) {
-            if (rooms.has(meta.room)) {
-              document.getElementById('status-' + meta.room).textContent = 'Offline';
-              document.getElementById('debug-' + meta.room).textContent = 'Camera disconnessa';
-              console.log('[ADMIN] Camera', meta.room, 'offline');
-            }
-            return;
-          }
-          
-          currentRoom = meta.room;
-          console.log('[ADMIN] Ricevuto meta per', currentRoom, meta);
-        } 
-        // Gestione frame video
-        else if (e.data instanceof Blob && currentRoom) {
-          if (!rooms.has(currentRoom)) {
-            const div = document.createElement('div');
-            div.className = 'cam';
-            div.innerHTML = \`
-              <h2>\${currentRoom}</h2>
-              <video id="video-\${currentRoom}" autoplay playsinline></video>
-              <div class="status" id="status-\${currentRoom}">Online</div>
-              <div class="controls">
-                <button onclick="sendCameraCommand('\${currentRoom}','environment')">Posteriore</button>
-                <button onclick="sendCameraCommand('\${currentRoom}','user')">Anteriore</button>
-              </div>
-              <div class="debug" id="debug-\${currentRoom}"></div>
-            \`;
-            grid.appendChild(div);
-            rooms.set(currentRoom, div);
-            createMediaSource(currentRoom);
-            console.log('[ADMIN] Creata view per', currentRoom);
-          }
-
-          const sourceBuffer = sourceBuffers.get(currentRoom);
-          if (!sourceBuffer || sourceBuffer.updating) {
-            console.log('[ADMIN] Buffer non pronto per', currentRoom);
-            return;
-          }
-
-          try {
-            const arrayBuffer = await e.data.arrayBuffer();
-            sourceBuffer.appendBuffer(arrayBuffer);
-            document.getElementById('status-' + currentRoom).textContent = 'Live';
-            document.getElementById('debug-' + currentRoom).textContent = 
-              \`Frame ricevuto: \${arrayBuffer.byteLength} bytes\`;
-          } catch (err) {
-            console.error('[ADMIN] Errore append buffer:', err);
-            document.getElementById('debug-' + currentRoom).textContent = 
-              'Errore decodifica: ' + err.message;
-            
-            // Se il MediaSource è in errore, prova a reinizializzarlo
-            if (err.name === 'InvalidStateError') {
-              console.log('[ADMIN] Tento reinizializzazione MediaSource per', currentRoom);
-              resetMediaSource(currentRoom);
-            }
-          }
+        const { room, timestamp } = JSON.parse(e.data);
+        if (!rooms.has(room)) {
+          const div = document.createElement('div');
+          div.className = 'cam';
+          div.innerHTML = \`
+            <h2>\${room}</h2>
+            <img id="img-\${room}">
+            <div class="status" id="status-\${room}">Online</div>
+          \`;
+          grid.appendChild(div);
+          rooms.set(room, div);
         }
-      } catch (err) {
-        console.error('[ADMIN] Errore generale:', err);
-      }
-    };
-  </script>
-</body>
-</html>`;
-        console.log('[ADMIN] Frame mostrato per', currentRoom, url);
-      }
+        const img = document.getElementById('img-' + room);
+        img.src = URL.createObjectURL(e.data.blob || e.data);
+        document.getElementById('status-' + room).textContent = 'Live';
+      } catch(err) {}
     };
   </script>
 </body></html>
 `;
 
-// Configura WebSocket servers
+// Salva admin.html dinamicamente
+const fs = require('fs');
+fs.writeFileSync('admin.html', adminHtml);
 
 app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
@@ -428,7 +71,6 @@ const bgWss = new ws.Server({ noServer: true });
 const adminWss = new ws.Server({ noServer: true });
 
 const clients = new Map(); // room → ws
-let frameCount = 0;
 
 bgWss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -439,25 +81,14 @@ bgWss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
-    if (typeof data === 'string') {
-      console.log('[SERVER] Ricevuto messaggio stringa da', room, data);
-    } else {
-      console.log('[SERVER] Ricevuto frame binario da', room, data?.byteLength || data?.size || '?', 'bytes');
-    }
-
     const msg = JSON.stringify({ room, timestamp: Date.now() });
 
     // Invia a tutti gli admin
     adminWss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        // Prima invia i metadati come stringa
-        client.send(msg);
-        console.log('[SERVER] Inviato metadati a admin:', msg);
-        
-        // Poi invia il frame video
+      if (client.readyState === ws.OPEN) {
+        client.send(msg, { binary: true });
         if (data instanceof Blob || data.byteLength) {
           client.send(data);
-          console.log('[SERVER] Inviato frame a admin per', room);
         }
       }
     });
@@ -467,7 +98,7 @@ bgWss.on('connection', (ws, req) => {
     clients.delete(room);
     // Notifica admin che è offline
     adminWss.clients.forEach(c => {
-      if (c.readyState === WebSocket.OPEN) {
+      if (c.readyState === ws.OPEN) {
         c.send(JSON.stringify({ room, offline: true }));
       }
     });
@@ -477,48 +108,24 @@ bgWss.on('connection', (ws, req) => {
 // Admin si connette qui
 adminWss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'welcome' }));
-
-  // Ricevi comando dall'admin e inoltra al client giusto
-  ws.on('message', (msg) => {
-    try {
-      const cmd = JSON.parse(msg);
-      if (cmd.type === 'camera' && cmd.room && cmd.mode) {
-        const client = clients.get(cmd.room);
-        if (client && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: 'camera', mode: cmd.mode }));
-        }
-      }
-    } catch {}
-  });
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`Server: http://localhost:${PORT}`);
+  console.log(`Server: https://localhost:${PORT}`);
 });
 
 server.on('upgrade', (req, socket, head) => {
-  try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const pathname = url.pathname;
+  const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
 
-    console.log('[WS] Richiesta upgrade per:', pathname);
-
-    if (pathname === '/bg-stream') {
-      bgWss.handleUpgrade(req, socket, head, ws => {
-        console.log('[WS] Client connesso a bg-stream');
-        bgWss.emit('connection', ws, req);
-      });
-    } else if (pathname === '/bg-admin') {
-      adminWss.handleUpgrade(req, socket, head, ws => {
-        console.log('[WS] Admin connesso');
-        adminWss.emit('connection', ws, req);
-      });
-    } else {
-      console.log('[WS] Pathname non valido:', pathname);
-      socket.destroy();
-    }
-  } catch (err) {
-    console.error('[WS] Errore upgrade:', err);
+  if (pathname === '/bg-stream') {
+    bgWss.handleUpgrade(req, socket, head, ws => {
+      bgWss.emit('connection', ws, req);
+    });
+  } else if (pathname === '/bg-admin') {
+    adminWss.handleUpgrade(req, socket, head, ws => {
+      adminWss.emit('connection', ws, req);
+    });
+  } else {
     socket.destroy();
   }
 });
