@@ -25,56 +25,80 @@ const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${location.host}/bg-admin`);
 const rooms = new Map();
 const imageCache = new Map();
+let lastUpdate = Date.now();
 
 ws.onopen = () => console.log('✅ Admin connesso');
 ws.onerror = err => console.error('WebSocket error:', err);
 ws.onclose = () => console.warn('WebSocket chiuso');
 
-ws.onmessage = e => {
-  if (e.data instanceof Blob) return; // frame binario gestito altrove
+ws.onmessage = async e => {
+  if (e.data instanceof Blob) {
+    const currentRoom = localStorage.getItem('currentRoom');
+    if (!currentRoom) return;
+    const roomData = rooms.get(currentRoom);
+    if (!roomData || !roomData.img) return;
 
-  const data = JSON.parse(e.data);
-  if (data.type === 'welcome') return;
+    if (Date.now() - lastUpdate < 50) return; // circa 20 FPS
+    const oldUrl = imageCache.get(currentRoom);
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    const newUrl = URL.createObjectURL(e.data);
+    roomData.img.src = newUrl;
+    imageCache.set(currentRoom, newUrl);
 
-  const roomKey = data.room;
-  if (!rooms.has(roomKey)) {
-    const div = document.createElement('div');
-    div.className = 'cam';
+    const statusEl = document.getElementById('status-' + currentRoom);
+    if (statusEl) statusEl.textContent = 'Live: ' + new Date().toLocaleTimeString();
+    lastUpdate = Date.now();
+  } else {
+    const data = JSON.parse(e.data);
+    if (data.type === 'welcome') return;
+    if (data.offline) {
+      const roomData = rooms.get(data.room);
+      if (roomData && roomData.status) roomData.status.textContent = 'Offline';
+      return;
+    }
 
-    const title = document.createElement('h2');
-    title.textContent = roomKey;
+    const room = data.room;
+    localStorage.setItem('currentRoom', room);
 
-    const backImg = document.createElement('img');
-    backImg.id = `img-${roomKey}-back`;
-    const frontImg = document.createElement('img');
-    frontImg.id = `img-${roomKey}-front`;
+    if (!rooms.has(room)) {
+      const div = document.createElement('div');
+      div.className = 'cam';
+      const img = document.createElement('img');
+      img.id = 'img-' + room;
+      const title = document.createElement('h2');
+      title.textContent = room;
+      const status = document.createElement('div');
+      status.className = 'status';
+      status.id = 'status-' + room;
+      status.textContent = 'Connesso';
 
-    const status = document.createElement('div');
-    status.className = 'status';
-    status.id = `status-${roomKey}`;
-    status.textContent = 'Connesso';
+      const controls = document.createElement('div');
+      controls.className = 'controls';
+      const btnFront = document.createElement('button');
+      btnFront.textContent = 'Front';
+      btnFront.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'user' }));
+      const btnBack = document.createElement('button');
+      btnBack.textContent = 'Back';
+      btnBack.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'environment' }));
+      controls.appendChild(btnFront);
+      controls.appendChild(btnBack);
 
-    const controls = document.createElement('div');
-    controls.className = 'controls';
-    const btnFront = document.createElement('button');
-    btnFront.textContent = 'Front';
-    btnFront.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'user' }));
-    const btnBack = document.createElement('button');
-    btnBack.textContent = 'Back';
-    btnBack.onclick = () => ws.send(JSON.stringify({ type:'switchCamera', camera:'environment' }));
-    controls.appendChild(btnFront);
-    controls.appendChild(btnBack);
+      div.appendChild(title);
+      div.appendChild(img);
+      div.appendChild(status);
+      div.appendChild(controls);
 
-    div.appendChild(title);
-    div.appendChild(backImg);
-    div.appendChild(frontImg);
-    div.appendChild(status);
-    div.appendChild(controls);
-
-    grid.appendChild(div);
-    rooms.set(roomKey, { div, backImg, frontImg, status, controls });
+      grid.appendChild(div);
+      rooms.set(room, { div, img, status, controls });
+    }
   }
 };
+
+window.addEventListener('beforeunload', () => {
+  imageCache.forEach(url => URL.revokeObjectURL(url));
+  imageCache.clear();
+  if (ws.readyState === WebSocket.OPEN) ws.close();
+});
 </script>
 </body>
 </html>
