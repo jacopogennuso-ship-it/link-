@@ -2,15 +2,16 @@ const express = require('express');
 const ws = require('ws');
 const path = require('path');
 const fs = require('fs');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// === SERVE CLIENT (index.html) ===
+// === PAGINA CLIENT ===
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// === SERVE ADMIN CON PASSWORD ===
+// === PAGINA ADMIN PROTETTA ===
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') {
     return res.status(403).send('Accesso negato');
@@ -18,35 +19,36 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// === CREA ADMIN.HTML DINAMICAMENTE SE NON ESISTE ===
+// === CREAZIONE FILE ADMIN SE NON ESISTE ===
 if (!fs.existsSync(path.join(__dirname, 'admin.html'))) {
-  fs.writeFileSync(path.join(__dirname, 'admin.html'), '<!-- admin.html verrà aggiornato automaticamente -->');
+  fs.writeFileSync(path.join(__dirname, 'admin.html'), '<!-- generato automaticamente -->');
 }
 
-// === WEBSOCKET SERVERS ===
-const bgWss = new ws.Server({ noServer: true });     // utenti che inviano video
-const adminWss = new ws.Server({ noServer: true });  // dashboard admin
+// === WEBSOCKETS ===
+const bgWss = new ws.Server({ noServer: true });     // per i client (camere)
+const adminWss = new ws.Server({ noServer: true });  // per la dashboard
 
 const clients = new Map(); // room → ws
 
-// === HANDLER STREAM IN INGRESSO (da utenti) ===
+// === CLIENT CAMERA (bg-stream) ===
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
 
-  console.log(`📷 Nuova camera connessa: ${room}`);
+  console.log(`📷 Camera connessa: ${room}`);
   clients.set(room, socket);
 
   socket.on('message', (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
-    // Invia metadati e frame a tutti gli admin collegati
     const metadata = JSON.stringify({ room, timestamp: Date.now() });
-    for (const client of adminWss.clients) {
-      if (client.readyState === ws.OPEN) {
+
+    // Invia a tutti gli admin collegati
+    for (const admin of adminWss.clients) {
+      if (admin.readyState === ws.OPEN) {
         try {
-          client.send(metadata);
-          if (data instanceof Buffer) client.send(data, { binary: true });
+          admin.send(metadata);
+          if (data instanceof Buffer) admin.send(data, { binary: true });
         } catch (err) {
           console.error('Errore invio frame:', err);
         }
@@ -65,17 +67,18 @@ bgWss.on('connection', (socket, req) => {
   });
 });
 
-// === ADMIN HANDLER ===
+// === ADMIN (bg-admin) ===
 adminWss.on('connection', (socket) => {
   console.log('🖥️ Admin collegato');
   socket.send(JSON.stringify({ type: 'welcome' }));
 });
 
-// === SERVER HTTP + UPGRADE ===
+// === AVVIO SERVER ===
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server attivo su: http://localhost:${PORT}`);
 });
 
+// === GESTIONE UPGRADE WEBSOCKET ===
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
 
