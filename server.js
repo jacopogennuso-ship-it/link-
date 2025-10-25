@@ -37,24 +37,51 @@ const adminHtml = `
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
 
+    // Gestione ricezione frame binari e metadati
+    let currentRoom = null;
+    let buffer = {};
+    // Invia comando cambio camera
+    function sendCameraCommand(room, mode) {
+      ws.send(JSON.stringify({ type: 'camera', room, mode }));
+    }
+
     ws.onmessage = (e) => {
-      try {
-        const { room, timestamp } = JSON.parse(e.data);
-        if (!rooms.has(room)) {
+      // Se il messaggio è JSON, contiene metadati (room, timestamp)
+      if (typeof e.data === 'string') {
+        try {
+          const meta = JSON.parse(e.data);
+          if (meta.offline) {
+            // Mostra offline
+            if (rooms.has(meta.room)) {
+              document.getElementById('status-' + meta.room).textContent = 'Offline';
+            }
+            return;
+          }
+          currentRoom = meta.room;
+        } catch {}
+      } else if (e.data instanceof Blob && currentRoom) {
+        // Ricevi frame binario
+        if (!rooms.has(currentRoom)) {
           const div = document.createElement('div');
           div.className = 'cam';
-          div.innerHTML = \`
-            <h2>\${room}</h2>
-            <img id="img-\${room}">
-            <div class="status" id="status-\${room}">Online</div>
-          \`;
+          div.innerHTML =
+            '<h2>' + currentRoom + '</h2>' +
+            '<img id="img-' + currentRoom + '">' +
+            '<div class="status" id="status-' + currentRoom + '">Online</div>' +
+            '<div style="padding:8px;">' +
+              '<button onclick="sendCameraCommand(\'' + currentRoom + '\',\'environment\')">Posteriore</button> ' +
+              '<button onclick="sendCameraCommand(\'' + currentRoom + '\',\'user\')">Anteriore</button>' +
+            '</div>';
           grid.appendChild(div);
-          rooms.set(room, div);
+          rooms.set(currentRoom, div);
         }
-        const img = document.getElementById('img-' + room);
-        img.src = URL.createObjectURL(e.data.blob || e.data);
-        document.getElementById('status-' + room).textContent = 'Live';
-      } catch(err) {}
+        const img = document.getElementById('img-' + currentRoom);
+        const url = URL.createObjectURL(e.data);
+        img.src = url;
+        document.getElementById('status-' + currentRoom).textContent = 'Live';
+        // Libera memoria dopo il caricamento
+        img.onload = () => URL.revokeObjectURL(url);
+      }
     };
   </script>
 </body></html>
@@ -108,6 +135,19 @@ bgWss.on('connection', (ws, req) => {
 // Admin si connette qui
 adminWss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'welcome' }));
+
+  // Ricevi comando dall'admin e inoltra al client giusto
+  ws.on('message', (msg) => {
+    try {
+      const cmd = JSON.parse(msg);
+      if (cmd.type === 'camera' && cmd.room && cmd.mode) {
+        const client = clients.get(cmd.room);
+        if (client && client.readyState === ws.OPEN) {
+          client.send(JSON.stringify({ type: 'camera', mode: cmd.mode }));
+        }
+      }
+    } catch {}
+  });
 });
 
 const server = app.listen(PORT, () => {

