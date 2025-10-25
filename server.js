@@ -31,27 +31,22 @@ bgWss.on('connection', (socket, req) => {
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
-        // Comando da admin per cambiare fotocamera
         if (msg.type === 'switchCamera') {
-          // Invia comando al client
           if (clients.has(room)) clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
           return;
         }
         if (data === 'ping') return;
-      } catch (err) {
-        // non JSON, probabilmente frame
-      }
+      } catch {}
     }
 
     const metadata = JSON.stringify({ room, timestamp: Date.now() });
 
-    // Invia a tutti gli admin
     for (const admin of adminWss.clients) {
       if (admin.readyState === ws.OPEN) {
         try {
           admin.send(metadata);
           if (data instanceof Buffer) admin.send(data, { binary: true });
-        } catch (err) { console.error('Errore invio frame:', err); }
+        } catch (err) { console.error('Errore invio frame/audio:', err); }
       }
     }
   });
