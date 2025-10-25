@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Pagine
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
@@ -13,8 +14,11 @@ app.get('/admin', (req, res) => {
 
 const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
 
+// WebSocket signaling
 const wss = new WebSocketServer({ noServer: true });
-const rooms = new Map(); // room -> {client: ws, admins: Set<ws>}
+
+// Map room -> {client: ws, admins: Set<ws>}
+const rooms = new Map();
 
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -41,13 +45,15 @@ function handleMessage(ws, msg) {
     const r = rooms.get(ws.room);
     if (!r) return;
     if (ws.role === 'client') {
-      r.admins.forEach(admin => { if (admin.readyState === 1) admin.send(msg); });
+      r.admins.forEach(admin => { if (admin.readyState === 1) admin.send(JSON.stringify(data)); });
     } else {
-      if (r.client && r.client.readyState === 1) r.client.send(msg);
+      if (r.client && r.client.readyState === 1) r.client.send(JSON.stringify(data));
     }
   } else if (data.type === 'switchCamera') {
     const r = rooms.get(ws.room);
-    if (r?.client && r.client.readyState === 1) r.client.send(JSON.stringify({ type: 'switchCamera', camera: data.camera }));
+    if (r?.client && r.client.readyState === 1) {
+      r.client.send(JSON.stringify({ type: 'switchCamera', camera: data.camera }));
+    }
   }
 }
 
@@ -57,5 +63,3 @@ function handleClose(ws) {
   if (ws.role === 'client') r.client = null;
   else r.admins.delete(ws);
 }
-
-

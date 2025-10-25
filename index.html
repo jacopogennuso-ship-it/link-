@@ -9,37 +9,50 @@
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
 let pc = new RTCPeerConnection();
-let ws, stream;
+let ws;
+let stream;
 let currentCamera = 'environment';
-
-function connect() {
-  ws = new WebSocket(`wss://${location.host}/signal`);
-  ws.onopen = () => initMedia(currentCamera);
-  ws.onmessage = async e => {
-    const data = JSON.parse(e.data);
-    if(data.type === 'answer') await pc.setRemoteDescription({ type:'answer', sdp:data.sdp });
-    else if(data.type === 'ice') await pc.addIceCandidate(data.candidate);
-    else if(data.type === 'switchCamera') initMedia(data.camera);
-  };
-}
 
 async function initMedia(camera = currentCamera) {
   currentCamera = camera;
-  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if (stream) stream.getTracks().forEach(t=>t.stop());
   stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:camera}, audio:true });
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  
+  const senders = pc.getSenders();
+  stream.getTracks().forEach(track => {
+    const sender = senders.find(s => s.track?.kind === track.kind);
+    if (sender) sender.replaceTrack(track);
+    else pc.addTrack(track, stream);
+  });
+}
 
-  if (!ws || ws.readyState!==1) return;
+function connect() {
+  ws = new WebSocket(`wss://${location.host}/signal`);
+  ws.onopen = async () => {
+    await initMedia(currentCamera);
+    ws.send(JSON.stringify({ type:'register', role:'client', room }));
 
-  ws.send(JSON.stringify({ type:'register', role:'client', room }));
+    pc.onicecandidate = e => {
+      if (e.candidate && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type:'ice', candidate:e.candidate, room }));
+      }
+    };
 
-  pc.onicecandidate = e => {
-    if(e.candidate && ws.readyState===1) ws.send(JSON.stringify({ type:'ice', candidate:e.candidate, room }));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    ws.send(JSON.stringify({ type:'offer', sdp:offer.sdp, room }));
   };
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  ws.send(JSON.stringify({ type:'offer', sdp:offer.sdp, room }));
+  ws.onmessage = async e => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'answer') {
+      await pc.setRemoteDescription({ type:'answer', sdp:data.sdp });
+    } else if (data.type === 'ice') {
+      await pc.addIceCandidate(data.candidate);
+    } else if (data.type === 'switchCamera') {
+      initMedia(data.camera);
+    }
+  };
 }
 
 connect();

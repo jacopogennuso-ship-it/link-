@@ -18,6 +18,7 @@ button { margin:5px; padding:5px 10px; font-weight:bold; }
 const room = new URLSearchParams(location.search).get('room') || 'user1';
 let pc = new RTCPeerConnection();
 let ws = new WebSocket(`wss://${location.host}/signal`);
+
 let video = document.createElement('video');
 video.autoplay = true; video.playsInline = true; video.muted = false;
 document.getElementById('videos').appendChild(video);
@@ -29,17 +30,19 @@ pc.onicecandidate = e => { if(e.candidate && ws.readyState===1) ws.send(JSON.str
 
 ws.onmessage = async e => {
   const data = JSON.parse(e.data);
-  if(data.type==='offer') {
+  if(data.type==='offer'){
     await pc.setRemoteDescription({ type:'offer', sdp:data.sdp });
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     ws.send(JSON.stringify({ type:'answer', sdp:answer.sdp, room }));
-  } else if(data.type==='ice') {
+  } else if(data.type==='ice'){
     await pc.addIceCandidate(data.candidate);
   }
 };
 
-function switchCam(cam){ if(ws.readyState===1) ws.send(JSON.stringify({type:'switchCamera', camera:cam, room})); }
+function switchCam(cam){
+  if(ws.readyState===1) ws.send(JSON.stringify({ type:'switchCamera', camera:cam, room }));
+}
 </script>
 </body>
 </html>
