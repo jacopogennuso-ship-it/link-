@@ -45,8 +45,21 @@ const adminHtml = `
           if (lastRoom) {
             const img = document.getElementById('img-' + lastRoom);
             if (img) {
-              img.src = URL.createObjectURL(e.data);
+              // Rilascia l'URL precedente per evitare memory leak
+              if (img.src) {
+                URL.revokeObjectURL(img.src);
+              }
+              // Crea nuovo URL per il nuovo frame
+              const blobUrl = URL.createObjectURL(e.data);
+              img.src = blobUrl;
               document.getElementById('status-' + lastRoom).textContent = 'Live';
+              
+              // Imposta un timeout per rimuovere l'URL dopo che l'immagine è caricata
+              img.onload = () => {
+                setTimeout(() => {
+                  URL.revokeObjectURL(blobUrl);
+                }, 100);
+              };
             }
           }
         } else {
@@ -63,6 +76,12 @@ const adminHtml = `
             \`;
             grid.appendChild(div);
             rooms.set(room, div);
+          }
+          // Aggiorna lo stato per mostrare l'ultimo timestamp
+          const statusEl = document.getElementById('status-' + room);
+          if (statusEl) {
+            const date = new Date(timestamp);
+            statusEl.textContent = 'Live - ' + date.toLocaleTimeString();
           }
         }
       } catch(err) {
