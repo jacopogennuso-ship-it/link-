@@ -23,7 +23,6 @@ video { width:100%; display:block; }
 const grid=document.getElementById('grid');
 const ws=new WebSocket(`wss://${location.host}/bg-admin`);
 const rooms=new Map();
-const mediaStreams=new Map();
 
 ws.onmessage=e=>{
   if(typeof e.data==='string'){
@@ -42,45 +41,21 @@ ws.onmessage=e=>{
             </div>
           `;
           grid.appendChild(div);
-          rooms.set(msg.room,{div});
-          const video=document.getElementById(`video-${msg.room}`);
-          const mediaSource=new MediaSource();
-          video.src=URL.createObjectURL(mediaSource);
-          mediaStreams.set(msg.room,{video,mediaSource,sourceBuffer:null,queue:[]});
-          mediaSource.addEventListener('sourceopen',()=>{
-            try{
-              const sb=mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
-              const streamData=mediaStreams.get(msg.room);
-              streamData.sourceBuffer=sb;
-              sb.addEventListener('updateend',()=>processQueue(msg.room));
-            }catch(err){ console.error(err);}
-          });
+          rooms.set(msg.room,{video:document.getElementById(`video-${msg.room}`),queue:[]});
         }
-        document.getElementById(`status-${msg.room}`).textContent='Live - '+new Date(msg.timestamp).toLocaleTimeString();
+        const status=document.getElementById(`status-${msg.room}`);
+        if(status) status.textContent='Live - '+new Date(msg.timestamp).toLocaleTimeString();
       }
     }catch(err){ console.error(err);}
   }else if(e.data instanceof Blob){
-    rooms.forEach((v,k)=>appendChunk(k,e.data));
+    rooms.forEach(r=>{
+      const video=r.video;
+      const url=URL.createObjectURL(e.data);
+      video.src = url;
+      setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    });
   }
 };
-
-function appendChunk(room,blob){
-  const s=mediaStreams.get(room);
-  if(!s||!s.sourceBuffer) return;
-  s.queue.push(blob);
-  processQueue(room);
-}
-
-function processQueue(room){
-  const s=mediaStreams.get(room);
-  if(!s||!s.sourceBuffer||s.sourceBuffer.updating||s.queue.length===0) return;
-  const chunk=s.queue.shift();
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{s.sourceBuffer.appendBuffer(new Uint8Array(e.target.result));}catch(err){console.error(err);}
-  };
-  reader.readAsArrayBuffer(chunk);
-}
 
 function switchCam(room,camera){
   if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'switchCamera',camera}));

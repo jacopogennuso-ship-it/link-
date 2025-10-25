@@ -5,43 +5,42 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve client
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// WebSocket
+// WebSocket servers
 const bgWss = new ws.Server({ noServer: true });
 const adminWss = new ws.Server({ noServer: true });
+const clients = new Map();
 
-const clients = new Map(); // room → ws
-
+// Client camera connection
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
-  console.log(`📷 Camera connessa: ${room}`);
   clients.set(room, socket);
+  console.log(`📷 Camera connessa: ${room}`);
 
   socket.on('message', data => {
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
-        if (msg.type === 'switchCamera' && clients.has(room)) {
-          clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
-          return;
+        // Cambio fotocamera dal admin
+        if (msg.type === 'switchCamera') {
+          if (socket.readyState === ws.OPEN) socket.send(JSON.stringify({ type:'switchCamera', camera: msg.camera }));
         }
         if (data === 'ping') return;
       } catch {}
     }
 
-    // Invia a tutti gli admin
+    // Invia blob e metadati a tutti gli admin
     const meta = JSON.stringify({ room, timestamp: Date.now() });
     for (const admin of adminWss.clients) {
       if (admin.readyState === ws.OPEN) {
-        admin.send(meta);
         if (data instanceof Buffer) admin.send(data, { binary: true });
+        admin.send(meta);
       }
     }
   });
@@ -55,10 +54,14 @@ bgWss.on('connection', (socket, req) => {
   });
 });
 
-adminWss.on('connection', socket => socket.send(JSON.stringify({ type: 'welcome' })));
+// Admin connection
+adminWss.on('connection', socket => {
+  console.log('🖥️ Admin connesso');
+  socket.send(JSON.stringify({ type: 'welcome' }));
+});
 
+// HTTP server upgrade
 const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
-
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
   if (pathname === '/bg-stream') bgWss.handleUpgrade(req, socket, head, ws => bgWss.emit('connection', ws, req));
