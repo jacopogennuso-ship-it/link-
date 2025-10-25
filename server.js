@@ -1,5 +1,5 @@
 const express = require('express');
-const ws = require('ws');
+const WebSocket = require('ws');
 const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,27 +28,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// === ADMIN DASHBOARD (admin.html) ===
-const adminHtml = `
-<!DOCTYPE html>
-<html><head><title>Live Background Cam</title>
-<style>
-  body { margin:0; background:#111; color:#0f0; font-family:Arial; padding:20px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:15px; }
-  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#000; position:relative; }
-  video { width:100%; height:auto; display:block; background:#000; min-height:200px; }
-  h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
-  .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
-  .controls { padding:8px; text-align:center; background:rgba(0,0,0,0.8); }
-  button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 4px; cursor:pointer; }
-  button:hover { background:#fff; }
-  .debug { color:#0f0; font-size:12px; padding:4px; word-wrap:break-word; }
-</style>
-</head>
-<body>
-  <h1>Camera in Background</h1>
-  <div id="grid" class="grid"></div>
-  <script>
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
     // Dichiarazioni globali
     const grid = document.getElementById('grid');
     const adminSocket = new WebSocket('wss://' + location.host + '/bg-admin');
@@ -336,9 +318,7 @@ const adminHtml = `
 </body></html>
 `;
 
-// Salva admin.html dinamicamente
-const fs = require('fs');
-fs.writeFileSync('admin.html', adminHtml);
+// Configura WebSocket servers
 
 app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
@@ -368,7 +348,7 @@ bgWss.on('connection', (ws, req) => {
 
     // Invia a tutti gli admin
     adminWss.clients.forEach(client => {
-      if (client.readyState === ws.OPEN) {
+      if (client.readyState === WebSocket.OPEN) {
         // Prima invia i metadati come stringa
         client.send(msg);
         console.log('[SERVER] Inviato metadati a admin:', msg);
@@ -386,7 +366,7 @@ bgWss.on('connection', (ws, req) => {
     clients.delete(room);
     // Notifica admin che è offline
     adminWss.clients.forEach(c => {
-      if (c.readyState === ws.OPEN) {
+      if (c.readyState === WebSocket.OPEN) {
         c.send(JSON.stringify({ room, offline: true }));
       }
     });
@@ -403,7 +383,7 @@ adminWss.on('connection', (ws) => {
       const cmd = JSON.parse(msg);
       if (cmd.type === 'camera' && cmd.room && cmd.mode) {
         const client = clients.get(cmd.room);
-        if (client && client.readyState === ws.OPEN) {
+        if (client && client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({ type: 'camera', mode: cmd.mode }));
         }
       }
