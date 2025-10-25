@@ -43,33 +43,55 @@
       rooms.set(room, { div, img, status });
     }
 
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      grid.innerHTML = ''; // Clear existing rooms on reconnect
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      // Clear all statuses to show disconnected state
+      rooms.forEach(room => {
+        if (room.status) {
+          room.status.textContent = 'Disconnected';
+        }
+      });
+    };
+
     ws.onmessage = async (e) => {
       try {
         if (e.data instanceof Blob) {
           const currentRoom = localStorage.getItem('currentRoom');
-          if (currentRoom && (Date.now() - lastUpdate) >= UPDATE_INTERVAL) {
-            const roomData = rooms.get(currentRoom);
-            if (roomData && roomData.img) {
-              // Rilascia la vecchia URL
-              const oldUrl = imageCache.get(currentRoom);
-              if (oldUrl) {
-                URL.revokeObjectURL(oldUrl);
-              }
+          if (!currentRoom) return;
+          
+          const roomData = rooms.get(currentRoom);
+          if (!roomData || !roomData.img) return;
+          
+          if ((Date.now() - lastUpdate) < UPDATE_INTERVAL) return;
+          
+          // Clean up old URL before creating new one
+          const oldUrl = imageCache.get(currentRoom);
+          if (oldUrl) {
+            URL.revokeObjectURL(oldUrl);
+            imageCache.delete(currentRoom);
+          }
 
-              // Crea e usa la nuova URL
-              const newUrl = URL.createObjectURL(e.data);
-              roomData.img.src = newUrl;
-              imageCache.set(currentRoom, newUrl);
-              
-              // Aggiorna timestamp
-              lastUpdate = Date.now();
-              if (roomData.status) {
-                roomData.status.textContent = 'Live: ' + new Date().toLocaleTimeString();
-              }
-            }
+          // Create and use new URL
+          const newUrl = URL.createObjectURL(e.data);
+          roomData.img.src = newUrl;
+          imageCache.set(currentRoom, newUrl);
+          
+          // Update timestamp and status
+          lastUpdate = Date.now();
+          if (roomData.status) {
+            roomData.status.textContent = 'Live: ' + new Date().toLocaleTimeString();
           }
         } else {
-          // Gestione metadati
+          // Metadata handling
           const data = JSON.parse(e.data);
           if (data.room) {
             localStorage.setItem('currentRoom', data.room);
@@ -79,16 +101,28 @@
           }
         }
       } catch (err) {
-        console.error('Errore:', err);
+        console.error('Error processing message:', err);
       }
     };
 
-    // Mantieni viva la connessione
+    // Keep connection alive
     setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, 10000);
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      // Cleanup all Blob URLs
+      imageCache.forEach(url => URL.revokeObjectURL(url));
+      imageCache.clear();
+      
+      // Close WebSocket
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
   </script>
 </body>
 </html>
