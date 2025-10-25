@@ -5,62 +5,56 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve client
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-// Admin protetto
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// WebSocket servers
-const bgWss = new ws.Server({ noServer: true });     // camere
+const bgWss = new ws.Server({ noServer: true });     // client camere
 const adminWss = new ws.Server({ noServer: true });  // dashboard
 
 const clients = new Map(); // room → ws
 
-// Client camere
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
-  console.log(`📷 Camera connessa: ${room}`);
-  clients.set(room, socket);
+  const camera = url.searchParams.get('camera') || 'environment'; // front/user
+  console.log(`📷 Camera connessa: ${room} (${camera})`);
+  clients.set(`${room}-${camera}`, socket);
 
   socket.on('message', (data) => {
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
-        // Comando da admin per cambiare fotocamera
         if (msg.type === 'switchCamera') {
-          // Invia comando al client
-          if (clients.has(room)) clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
+          // Invia comando al client principale
+          const mainClient = clients.get(`${room}-current`);
+          if (mainClient && mainClient.readyState === ws.OPEN) {
+            mainClient.send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
+          }
           return;
         }
         if (data === 'ping') return;
-      } catch (err) {
-        // non JSON, probabilmente frame
-      }
+      } catch {}
     }
-
-    const metadata = JSON.stringify({ room, timestamp: Date.now() });
 
     // Invia a tutti gli admin
     for (const admin of adminWss.clients) {
       if (admin.readyState === ws.OPEN) {
         try {
-          admin.send(metadata);
-          if (data instanceof Buffer) admin.send(data, { binary: true });
+          if (!(data instanceof Buffer)) continue;
+          admin.send(JSON.stringify({ room, camera, timestamp: Date.now() }));
+          admin.send(data, { binary: true });
         } catch (err) { console.error('Errore invio frame:', err); }
       }
     }
   });
 
   socket.on('close', () => {
-    clients.delete(room);
-    console.log(`❌ Camera disconnessa: ${room}`);
+    clients.delete(`${room}-${camera}`);
     for (const admin of adminWss.clients) {
-      if (admin.readyState === ws.OPEN) admin.send(JSON.stringify({ room, offline: true }));
+      if (admin.readyState === ws.OPEN) admin.send(JSON.stringify({ room, camera, offline: true }));
     }
   });
 });
@@ -71,10 +65,8 @@ adminWss.on('connection', (socket) => {
   socket.send(JSON.stringify({ type: 'welcome' }));
 });
 
-// Avvio server
 const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
 
-// Gestione upgrade WebSocket
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
   if (pathname === '/bg-stream') bgWss.handleUpgrade(req, socket, head, ws => bgWss.emit('connection', ws, req));

