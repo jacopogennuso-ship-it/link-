@@ -54,10 +54,12 @@ const adminHtml = `
             // Mostra offline
             if (rooms.has(meta.room)) {
               document.getElementById('status-' + meta.room).textContent = 'Offline';
+              console.log('[ADMIN] Camera', meta.room, 'offline');
             }
             return;
           }
           currentRoom = meta.room;
+          console.log('[ADMIN] Ricevuto meta per', currentRoom);
         } catch {}
       } else if (e.data instanceof Blob && currentRoom) {
         // Ricevi frame binario
@@ -74,6 +76,7 @@ const adminHtml = `
             '</div>';
           grid.appendChild(div);
           rooms.set(currentRoom, div);
+          console.log('[ADMIN] Creato box camera per', currentRoom);
         }
         const img = document.getElementById('img-' + currentRoom);
         const url = URL.createObjectURL(e.data);
@@ -81,6 +84,7 @@ const adminHtml = `
         document.getElementById('status-' + currentRoom).textContent = 'Live';
         // Libera memoria dopo il caricamento
         img.onload = () => URL.revokeObjectURL(url);
+        console.log('[ADMIN] Frame mostrato per', currentRoom, url);
       }
     };
   </script>
@@ -108,6 +112,12 @@ bgWss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
+    if (typeof data === 'string') {
+      console.log('[SERVER] Ricevuto messaggio stringa da', room, data);
+    } else {
+      console.log('[SERVER] Ricevuto frame binario da', room, data?.byteLength || data?.size || '?', 'bytes');
+    }
+
     const msg = JSON.stringify({ room, timestamp: Date.now() });
 
     // Invia a tutti gli admin
@@ -116,6 +126,7 @@ bgWss.on('connection', (ws, req) => {
         client.send(msg, { binary: true });
         if (data instanceof Blob || data.byteLength) {
           client.send(data);
+          console.log('[SERVER] Inviato frame a admin per', room);
         }
       }
     });

