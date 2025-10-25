@@ -39,22 +39,49 @@ const adminHtml = `
 
     ws.onmessage = (e) => {
       try {
-        const { room, timestamp } = JSON.parse(e.data);
-        if (!rooms.has(room)) {
-          const div = document.createElement('div');
-          div.className = 'cam';
-          div.innerHTML = \`
-            <h2>\${room}</h2>
-            <img id="img-\${room}">
-            <div class="status" id="status-\${room}">Online</div>
-          \`;
-          grid.appendChild(div);
-          rooms.set(room, div);
+        // Se è una stringa, è un messaggio di controllo
+        if (typeof e.data === 'string') {
+          const data = JSON.parse(e.data);
+          if (data.offline) {
+            const statusEl = document.getElementById('status-' + data.room);
+            if (statusEl) statusEl.textContent = 'Offline';
+            return;
+          }
+          if (!data.room) return; // Ignora altri messaggi di controllo
+          
+          if (!rooms.has(data.room)) {
+            const div = document.createElement('div');
+            div.className = 'cam';
+            div.innerHTML = \`
+              <h2>\${data.room}</h2>
+              <img id="img-\${data.room}">
+              <div class="status" id="status-\${data.room}">Online</div>
+            \`;
+            grid.appendChild(div);
+            rooms.set(data.room, div);
+          }
+          document.getElementById('status-' + data.room).textContent = 'Live';
+        } 
+        // Se è un Blob, è un frame video
+        else if (e.data instanceof Blob) {
+          const msgBefore = e.lastMessageEvent?.data;
+          if (typeof msgBefore === 'string') {
+            try {
+              const { room } = JSON.parse(msgBefore);
+              if (room) {
+                const img = document.getElementById('img-' + room);
+                if (img) {
+                  const url = URL.createObjectURL(e.data);
+                  img.onload = () => URL.revokeObjectURL(img.src);
+                  img.src = url;
+                }
+              }
+            } catch(err) {}
+          }
         }
-        const img = document.getElementById('img-' + room);
-        img.src = URL.createObjectURL(e.data.blob || e.data);
-        document.getElementById('status-' + room).textContent = 'Live';
-      } catch(err) {}
+      } catch(err) {
+        console.error('Error processing message:', err);
+      }
     };
   </script>
 </body></html>
@@ -81,14 +108,18 @@ bgWss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
-    const msg = JSON.stringify({ room, timestamp: Date.now() });
-
     // Invia a tutti gli admin
     adminWss.clients.forEach(client => {
       if (client.readyState === ws.OPEN) {
-        client.send(msg, { binary: true });
-        if (data instanceof Blob || data.byteLength) {
-          client.send(data);
+        // Prima invia info sulla stanza
+        client.send(JSON.stringify({ 
+          room, 
+          timestamp: Date.now() 
+        }));
+        
+        // Poi invia il frame video
+        if (data instanceof Buffer || data instanceof Blob) {
+          client.send(data, { binary: true });
         }
       }
     });
