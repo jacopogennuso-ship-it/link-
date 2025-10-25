@@ -24,11 +24,10 @@ const adminHtml = `
 <style>
   body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:15px; }
-  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; }
-  img { width:100%; height:auto; display:block; }
+  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position: relative; }
+  video { width:100%; height:auto; display:block; }
   h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
   .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
-  canvas { width:100%; height:auto; display:block; }
 </style></head>
 <body>
   <h1>Camera in Background</h1>
@@ -38,43 +37,45 @@ const adminHtml = `
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
 
-    const frameBuffers = new Map();
-    
-    function setupStreamingCanvas(room) {
-      const canvas = document.createElement('canvas');
-      canvas.id = 'canvas-' + room;
-      const ctx = canvas.getContext('2d');
-      return { canvas, ctx };
+    const mediaSourceSupported = 'MediaSource' in window;
+    const mediaStreams = new Map();
+
+    function createMediaStream(room) {
+      const video = document.createElement('video');
+      video.id = 'video-' + room;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      
+      if (mediaSourceSupported) {
+        const mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
+        
+        mediaSource.addEventListener('sourceopen', () => {
+          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
+          mediaStreams.set(room, { video, mediaSource, sourceBuffer, queue: [] });
+        });
+      }
+      
+      return video;
     }
 
     ws.onmessage = async (e) => {
       try {
         if (e.data instanceof Blob) {
           const lastRoom = localStorage.getItem('lastRoom');
-          if (lastRoom) {
-            // Ottieni o crea il buffer per questa stanza
-            if (!frameBuffers.has(lastRoom)) {
-              const { canvas, ctx } = setupStreamingCanvas(lastRoom);
+          if (lastRoom && mediaSourceSupported) {
+            const stream = mediaStreams.get(lastRoom);
+            
+            if (!stream) {
+              const video = createMediaStream(lastRoom);
               const container = document.getElementById('img-' + lastRoom).parentElement;
-              container.replaceChild(canvas, document.getElementById('img-' + lastRoom));
-              frameBuffers.set(lastRoom, { ctx, frames: [] });
-            }
-
-            const buffer = frameBuffers.get(lastRoom);
-            
-            // Converti il blob in bitmap
-            const bitmap = await createImageBitmap(e.data);
-            
-            // Aggiorna le dimensioni del canvas se necessario
-            if (buffer.ctx.canvas.width !== bitmap.width) {
-              buffer.ctx.canvas.width = bitmap.width;
-              buffer.ctx.canvas.height = bitmap.height;
+              container.replaceChild(video, document.getElementById('img-' + lastRoom));
+            } else if (stream.sourceBuffer && !stream.sourceBuffer.updating) {
+              const arrayBuffer = await e.data.arrayBuffer();
+              stream.sourceBuffer.appendBuffer(arrayBuffer);
             }
             
-            // Disegna immediatamente il frame
-            buffer.ctx.drawImage(bitmap, 0, 0);
-            bitmap.close();
-
             document.getElementById('status-' + lastRoom).textContent = 'Live';
           }
         } else {
@@ -125,7 +126,9 @@ bgWss.on('connection', (ws, req) => {
 
   clients.set(room, ws);
 
-  ws.on('message', (data) => {
+  let isFirstChunk = true;
+  
+  ws.on('message', async (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
     const msg = JSON.stringify({ room, timestamp: Date.now() });
@@ -137,8 +140,23 @@ bgWss.on('connection', (ws, req) => {
           // Invia prima i metadati
           client.send(msg);
           
-          // Poi invia il frame video
+          // Invia i dati video
           if (data instanceof Buffer || data instanceof Blob) {
+            // Se è il primo chunk, aggiungiamo l'header WebM
+            if (isFirstChunk) {
+              const webmHeader = Buffer.from([
+                0x1a, 0x45, 0xdf, 0xa3, // EBML
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, // EBML size
+                0x42, 0x86, 0x81, 0x01, // EBMLVersion
+                0x42, 0xf7, 0x81, 0x01, // EBMLReadVersion
+                0x42, 0xf2, 0x81, 0x04, // EBMLMaxIDLength
+                0x42, 0xf3, 0x81, 0x08, // EBMLMaxSizeLength
+                0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d // DocType "webm"
+              ]);
+              client.send(webmHeader);
+              isFirstChunk = false;
+            }
+            
             client.send(data, { binary: true });
           }
         } catch (err) {
