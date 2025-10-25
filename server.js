@@ -51,7 +51,7 @@ const adminHtml = `
   <script>
     // Dichiarazioni globali
     const grid = document.getElementById('grid');
-    const ws = new WebSocket('wss://' + location.host + '/bg-admin');
+    const adminSocket = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
     const sourceBuffers = new Map();
     const mediaSourceMap = new Map();
@@ -108,7 +108,7 @@ const adminHtml = `
     }
 
     // Gestione messaggi WebSocket
-    ws.onmessage = async (e) => {
+    adminSocket.onmessage = async (e) => {
       try {
         // Se il messaggio è JSON, contiene metadati
         if (typeof e.data === 'string') {
