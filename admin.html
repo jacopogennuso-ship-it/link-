@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Background Cam</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>
+    body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:15px; }
+    .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position:relative; }
+    .cam img { width:100%; height:auto; display:block; object-fit:contain; }
+    h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
+    .status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.7); }
+  </style>
+</head>
+<body>
+  <h1>Camera in Background</h1>
+  <div id="grid" class="grid"></div>
+  <script>
+    const grid = document.getElementById('grid');
+    const ws = new WebSocket('wss://' + location.host + '/bg-admin');
+    const imageCache = new Map();
+    const rooms = new Map();
+    let lastUpdate = Date.now();
+    const UPDATE_INTERVAL = 100; // 10 FPS per ottimizzare prestazioni
+
+    function createRoom(room) {
+      const div = document.createElement('div');
+      div.className = 'cam';
+      const img = document.createElement('img');
+      img.id = 'img-' + room;
+      img.alt = 'Stream ' + room;
+      const title = document.createElement('h2');
+      title.textContent = room;
+      const status = document.createElement('div');
+      status.className = 'status';
+      status.id = 'status-' + room;
+      status.textContent = 'Connessione...';
+      
+      div.appendChild(title);
+      div.appendChild(img);
+      div.appendChild(status);
+      grid.appendChild(div);
+      rooms.set(room, { div, img, status });
+    }
+
+    ws.onmessage = async (e) => {
+      try {
+        if (e.data instanceof Blob) {
+          const currentRoom = localStorage.getItem('currentRoom');
+          if (currentRoom && (Date.now() - lastUpdate) >= UPDATE_INTERVAL) {
+            const roomData = rooms.get(currentRoom);
+            if (roomData && roomData.img) {
+              // Rilascia la vecchia URL
+              const oldUrl = imageCache.get(currentRoom);
+              if (oldUrl) {
+                URL.revokeObjectURL(oldUrl);
+              }
+
+              // Crea e usa la nuova URL
+              const newUrl = URL.createObjectURL(e.data);
+              roomData.img.src = newUrl;
+              imageCache.set(currentRoom, newUrl);
+              
+              // Aggiorna timestamp
+              lastUpdate = Date.now();
+              if (roomData.status) {
+                roomData.status.textContent = 'Live: ' + new Date().toLocaleTimeString();
+              }
+            }
+          }
+        } else {
+          // Gestione metadati
+          const data = JSON.parse(e.data);
+          if (data.room) {
+            localStorage.setItem('currentRoom', data.room);
+            if (!rooms.has(data.room)) {
+              createRoom(data.room);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Errore:', err);
+      }
+    };
+
+    // Mantieni viva la connessione
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 10000);
+  </script>
+</body>
+</html>
