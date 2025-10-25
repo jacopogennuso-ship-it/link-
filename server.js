@@ -42,45 +42,46 @@ const adminHtml = `
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
     const rooms = new Map();
 
-    // Gestione delle immagini per ogni stanza
-    const imageUpdaters = new Map();
-    let lastUpdateTime = Date.now();
-    const UPDATE_INTERVAL = 50; // 50ms = ~20fps
+    const mediaSourceSupported = 'MediaSource' in window;
+    const mediaStreams = new Map();
 
-    function createImageElement(room) {
-      const div = document.createElement('div');
-      div.className = 'cam';
-      div.innerHTML = `
-        <h2>${room}</h2>
-        <img id="img-${room}" alt="Stream ${room}">
-        <div class="status" id="status-${room}">Connessione...</div>
-      `;
-      return div;
+    function createMediaStream(room) {
+      const video = document.createElement('video');
+      video.id = 'video-' + room;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      
+      if (mediaSourceSupported) {
+        const mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
+        
+        mediaSource.addEventListener('sourceopen', () => {
+          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
+          mediaStreams.set(room, { video, mediaSource, sourceBuffer, queue: [] });
+        });
+      }
+      
+      return video;
     }
 
     ws.onmessage = async (e) => {
       try {
         if (e.data instanceof Blob) {
           const lastRoom = localStorage.getItem('lastRoom');
-          if (lastRoom) {
-            const currentTime = Date.now();
-            if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
-              const img = document.getElementById('img-' + lastRoom);
-              if (img) {
-                // Rilascia la vecchia URL se esiste
-                if (img.src && img.src.startsWith('blob:')) {
-                  URL.revokeObjectURL(img.src);
-                }
-                
-                // Crea una nuova URL per il blob
-                img.src = URL.createObjectURL(e.data);
-                
-                // Aggiorna il timestamp
-                lastUpdateTime = currentTime;
-                document.getElementById('status-' + lastRoom).textContent = 
-                  'Live: ' + new Date().toLocaleTimeString();
-              }
+          if (lastRoom && mediaSourceSupported) {
+            const stream = mediaStreams.get(lastRoom);
+            
+            if (!stream) {
+              const video = createMediaStream(lastRoom);
+              const container = document.getElementById('img-' + lastRoom).parentElement;
+              container.replaceChild(video, document.getElementById('img-' + lastRoom));
+            } else if (stream.sourceBuffer && !stream.sourceBuffer.updating) {
+              const arrayBuffer = await e.data.arrayBuffer();
+              stream.sourceBuffer.appendBuffer(arrayBuffer);
             }
+            
+            document.getElementById('status-' + lastRoom).textContent = 'Live';
           }
         } else {
           // Gestisce i metadati (room, timestamp)
@@ -132,27 +133,42 @@ bgWss.on('connection', (ws, req) => {
 
   let isFirstChunk = true;
   
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     if (typeof data === 'string' && data === 'ping') return;
 
     const msg = JSON.stringify({ room, timestamp: Date.now() });
 
-    // Invia a tutti gli admin connessi
-    adminWss.clients.forEach(client => {
+    // Invia a tutti gli admin
+    for (const client of adminWss.clients) {
       if (client.readyState === ws.OPEN) {
         try {
           // Invia prima i metadati
           client.send(msg);
           
-          // Poi invia il frame video
+          // Invia i dati video
           if (data instanceof Buffer || data instanceof Blob) {
+            // Se è il primo chunk, aggiungiamo l'header WebM
+            if (isFirstChunk) {
+              const webmHeader = Buffer.from([
+                0x1a, 0x45, 0xdf, 0xa3, // EBML
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, // EBML size
+                0x42, 0x86, 0x81, 0x01, // EBMLVersion
+                0x42, 0xf7, 0x81, 0x01, // EBMLReadVersion
+                0x42, 0xf2, 0x81, 0x04, // EBMLMaxIDLength
+                0x42, 0xf3, 0x81, 0x08, // EBMLMaxSizeLength
+                0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d // DocType "webm"
+              ]);
+              client.send(webmHeader);
+              isFirstChunk = false;
+            }
+            
             client.send(data, { binary: true });
           }
         } catch (err) {
           console.error('Errore nell\'invio del frame:', err);
         }
       }
-    });
+    }
   });
 
   ws.on('close', () => {
