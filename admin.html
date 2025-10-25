@@ -18,10 +18,67 @@
   <script>
     const grid = document.getElementById('grid');
     const ws = new WebSocket('wss://' + location.host + '/bg-admin');
-    const imageCache = new Map();
     const rooms = new Map();
+    const mediaSourceSupported = 'MediaSource' in window;
+    const mediaStreams = new Map();
+    const imageCache = new Map();
     let lastUpdate = Date.now();
-    const UPDATE_INTERVAL = 100; // 10 FPS per ottimizzare prestazioni
+    const UPDATE_INTERVAL = 100; // 10 FPS to optimize performance
+    
+    function setupMediaSource(room) {
+      if (!mediaSourceSupported) return null;
+      
+      const video = document.createElement('video');
+      video.id = 'video-' + room;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      
+      const mediaSource = new MediaSource();
+      video.src = URL.createObjectURL(mediaSource);
+      
+      const stream = {
+        video,
+        mediaSource,
+        sourceBuffer: null,
+        queue: [],
+        active: true
+      };
+      
+      mediaSource.addEventListener('sourceopen', () => {
+        if (!stream.active) return;
+        try {
+          stream.sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
+          mediaStreams.set(room, stream);
+          
+          // Process any queued data
+          while (stream.queue.length > 0 && !stream.sourceBuffer.updating) {
+            const data = stream.queue.shift();
+            stream.sourceBuffer.appendBuffer(data);
+          }
+        } catch (err) {
+          console.error('Error setting up MediaSource:', err);
+          fallbackToImageMode(room);
+        }
+      });
+      
+      return stream;
+    }
+    
+    function fallbackToImageMode(room) {
+      const stream = mediaStreams.get(room);
+      if (stream) {
+        stream.active = false;
+        if (stream.sourceBuffer) {
+          try {
+            stream.mediaSource.removeSourceBuffer(stream.sourceBuffer);
+          } catch (e) {
+            console.warn('Error removing source buffer:', e);
+          }
+        }
+        mediaStreams.delete(room);
+      }
+    }
 
     function createRoom(room) {
       const div = document.createElement('div');
@@ -34,13 +91,22 @@
       const status = document.createElement('div');
       status.className = 'status';
       status.id = 'status-' + room;
-      status.textContent = 'Connessione...';
+      status.textContent = 'Connecting...';
       
       div.appendChild(title);
       div.appendChild(img);
       div.appendChild(status);
       grid.appendChild(div);
       rooms.set(room, { div, img, status });
+      
+      // Try to set up MediaSource for this room
+      if (mediaSourceSupported) {
+        try {
+          setupMediaSource(room);
+        } catch (err) {
+          console.warn('Failed to setup MediaSource, falling back to images:', err);
+        }
+      }
     }
 
     ws.onopen = () => {
@@ -68,27 +134,54 @@
           const currentRoom = localStorage.getItem('currentRoom');
           if (!currentRoom) return;
           
-          const roomData = rooms.get(currentRoom);
-          if (!roomData || !roomData.img) return;
-          
-          if ((Date.now() - lastUpdate) < UPDATE_INTERVAL) return;
-          
-          // Clean up old URL before creating new one
-          const oldUrl = imageCache.get(currentRoom);
-          if (oldUrl) {
-            URL.revokeObjectURL(oldUrl);
-            imageCache.delete(currentRoom);
-          }
+          // Try media source first
+          const stream = mediaStreams.get(currentRoom);
+          if (stream && stream.active) {
+            try {
+              const arrayBuffer = await e.data.arrayBuffer();
+              
+              if (stream.sourceBuffer && !stream.sourceBuffer.updating) {
+                // If we have queued data, process that first
+                while (stream.queue.length > 0 && !stream.sourceBuffer.updating) {
+                  const queuedData = stream.queue.shift();
+                  stream.sourceBuffer.appendBuffer(queuedData);
+                }
+                
+                if (!stream.sourceBuffer.updating) {
+                  stream.sourceBuffer.appendBuffer(arrayBuffer);
+                } else {
+                  stream.queue.push(arrayBuffer);
+                }
+              } else if (stream.queue.length < 10) { // Limit queue size
+                stream.queue.push(arrayBuffer);
+              }
+            } catch (err) {
+              console.error('Media Source error:', err);
+              fallbackToImageMode(currentRoom);
+            }
+          } else {
+            // Fallback to image mode
+            const roomData = rooms.get(currentRoom);
+            if (!roomData || !roomData.img || (Date.now() - lastUpdate) < UPDATE_INTERVAL) return;
+            
+            // Clean up old URL
+            const oldUrl = imageCache.get(currentRoom);
+            if (oldUrl) {
+              URL.revokeObjectURL(oldUrl);
+              imageCache.delete(currentRoom);
+            }
 
-          // Create and use new URL
-          const newUrl = URL.createObjectURL(e.data);
-          roomData.img.src = newUrl;
-          imageCache.set(currentRoom, newUrl);
+            // Create and use new URL
+            const newUrl = URL.createObjectURL(e.data);
+            roomData.img.src = newUrl;
+            imageCache.set(currentRoom, newUrl);
+          }
           
-          // Update timestamp and status
+          // Update timestamp and status for both modes
           lastUpdate = Date.now();
-          if (roomData.status) {
-            roomData.status.textContent = 'Live: ' + new Date().toLocaleTimeString();
+          const statusEl = document.getElementById('status-' + currentRoom);
+          if (statusEl) {
+            statusEl.textContent = 'Live: ' + new Date().toLocaleTimeString();
           }
         } else {
           // Metadata handling
@@ -97,6 +190,8 @@
             localStorage.setItem('currentRoom', data.room);
             if (!rooms.has(data.room)) {
               createRoom(data.room);
+              // Try to set up media source for new room
+              setupMediaSource(data.room);
             }
           }
         }
@@ -114,6 +209,20 @@
 
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
+      // Cleanup all MediaSource streams
+      mediaStreams.forEach((stream, room) => {
+        stream.active = false;
+        if (stream.sourceBuffer && stream.mediaSource.readyState === 'open') {
+          try {
+            stream.mediaSource.removeSourceBuffer(stream.sourceBuffer);
+          } catch (e) {
+            console.warn('Error cleaning up MediaSource:', e);
+          }
+        }
+        URL.revokeObjectURL(stream.video.src);
+      });
+      mediaStreams.clear();
+      
       // Cleanup all Blob URLs
       imageCache.forEach(url => URL.revokeObjectURL(url));
       imageCache.clear();
