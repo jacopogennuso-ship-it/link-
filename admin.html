@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Background Cam</title>
+  <style>
+    body { margin:0; background:#111; color:#0f0; font-family:Arial; padding:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:15px; }
+    .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#000; position:relative; }
+    img { width:100%; height:auto; display:block; background:#000; min-height:200px; }
+    h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
+    .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
+    .controls { padding:8px; text-align:center; background:rgba(0,0,0,0.8); }
+    button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 4px; cursor:pointer; }
+    button:hover { background:#fff; }
+  </style>
+</head>
+<body>
+  <h1>Camera in Background</h1>
+  <div id="grid" class="grid"></div>
+  <script>
+    const grid = document.getElementById('grid');
+    const ws = new WebSocket('wss://' + location.host + '/bg-admin');
+    const rooms = new Map();
+
+    // Invia comando cambio camera
+    function sendCameraCommand(room, mode) {
+      ws.send(JSON.stringify({ type: 'camera', room, mode }));
+      console.log('[ADMIN] Inviato comando camera:', room, mode);
+    }
+
+    // Gestione ricezione frame binari e metadati
+    let currentRoom = null;
+    ws.onmessage = (e) => {
+      console.log('[ADMIN] Ricevuto messaggio:', typeof e.data);
+      
+      // Se il messaggio è JSON, contiene metadati (room, timestamp)
+      if (typeof e.data === 'string') {
+        try {
+          const meta = JSON.parse(e.data);
+          console.log('[ADMIN] Meta:', meta);
+          
+          if (meta.offline) {
+            if (rooms.has(meta.room)) {
+              document.getElementById('status-' + meta.room).textContent = 'Offline';
+              console.log('[ADMIN] Camera', meta.room, 'offline');
+            }
+            return;
+          }
+          
+          if (meta.room) {
+            currentRoom = meta.room;
+            console.log('[ADMIN] Room attiva:', currentRoom);
+          }
+        } catch (err) {
+          console.error('[ADMIN] Errore parsing JSON:', err);
+        }
+      } 
+      // Se è un Blob, è un frame video
+      else if (e.data instanceof Blob) {
+        console.log('[ADMIN] Frame ricevuto per', currentRoom, e.data.size, 'bytes');
+        
+        // Crea il box della camera se non esiste
+        if (currentRoom && !rooms.has(currentRoom)) {
+          const div = document.createElement('div');
+          div.className = 'cam';
+          div.innerHTML = `
+            <h2>${currentRoom}</h2>
+            <img id="img-${currentRoom}" alt="Camera feed">
+            <div class="status" id="status-${currentRoom}">Online</div>
+            <div class="controls">
+              <button onclick="sendCameraCommand('${currentRoom}','environment')">📸 Posteriore</button>
+              <button onclick="sendCameraCommand('${currentRoom}','user')">🤳 Anteriore</button>
+            </div>`;
+          grid.appendChild(div);
+          rooms.set(currentRoom, div);
+          console.log('[ADMIN] Nuovo box camera creato per', currentRoom);
+        }
+        
+        // Aggiorna l'immagine
+        if (currentRoom) {
+          const img = document.getElementById('img-' + currentRoom);
+          if (img) {
+            const url = URL.createObjectURL(e.data);
+            img.onload = () => {
+              URL.revokeObjectURL(url);
+              document.getElementById('status-' + currentRoom).textContent = 'Live';
+            };
+            img.src = url;
+            console.log('[ADMIN] Frame aggiornato per', currentRoom);
+          } else {
+            console.error('[ADMIN] Elemento img non trovato per', currentRoom);
+          }
+        }
+      }
+    };
+
+    ws.onopen = () => console.log('[ADMIN] WebSocket connesso');
+    ws.onclose = () => console.log('[ADMIN] WebSocket disconnesso');
+    ws.onerror = (err) => console.error('[ADMIN] Errore WebSocket:', err);
+  </script>
+</body>
+</html>

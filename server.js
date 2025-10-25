@@ -22,12 +22,15 @@ const adminHtml = `
 <!DOCTYPE html>
 <html><head><title>Live Background Cam</title>
 <style>
-  body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
+  body { margin:0; background:#111; color:#0f0; font-family:Arial; padding:20px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:15px; }
-  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; }
-  img { width:100%; height:auto; display:block; }
+  .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#000; position:relative; }
+  img { width:100%; height:auto; display:block; background:#000; min-height:200px; }
   h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
   .status { color:#0f0; font-size:12px; text-align:center; padding:4px; }
+  .controls { padding:8px; text-align:center; background:rgba(0,0,0,0.8); }
+  button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 4px; cursor:pointer; }
+  button:hover { background:#fff; }
 </style></head>
 <body>
   <h1>Camera in Background</h1>
