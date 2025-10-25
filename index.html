@@ -50,10 +50,6 @@
         } else {
           startSendingFrames();
         }
-        // Notifica il Service Worker di mantenere attiva la connessione
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage('KEEP_ALIVE');
-        }
       };
 
       ws.onmessage = async (e) => {
@@ -166,14 +162,14 @@
 
         currentCamera = mode;
         video.srcObject = stream;
+        await video.play();
         
-        return new Promise((resolve) => {
-          video.onloadedmetadata = () => {
-            startSendingFrames();
-            showStatus();
-            resolve();
-          };
-        });
+        video.onloadedmetadata = () => {
+          startSendingFrames();
+          showStatus();
+          log('Camera avviata con successo');
+        };
+
       } catch (err) {
         log('Errore camera: ' + err.message);
         
@@ -181,8 +177,6 @@
         let errorMessage = err.message;
         if (err.name === 'NotAllowedError') {
           errorMessage = 'Accesso alla fotocamera negato. Per favore, concedi i permessi nelle impostazioni del browser.';
-          // Mostra di nuovo il popup dei permessi
-          document.getElementById('permissions-popup').style.display = 'block';
         } else if (err.name === 'NotFoundError') {
           errorMessage = 'Nessuna fotocamera trovata sul dispositivo.';
         } else if (err.name === 'NotReadableError') {
@@ -218,16 +212,6 @@
       }).catch(err => {
         log('Errore ServiceWorker: ' + err.message);
       });
-    }
-
-        // Avvia il video
-        await video.play();
-        log('Camera avviata con successo');
-        
-      } catch (err) {
-        log('Errore camera: ' + err.message);
-        document.querySelector('.msg').innerHTML = `<div>Errore: ${err.message}</div>`;
-      }
     }
 
     // Mantieni attiva la pagina in background
