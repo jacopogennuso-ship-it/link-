@@ -34,10 +34,16 @@ app.post('/api/switch-camera', (req, res) => {
   // Notifica il client del cambio
   const client = clients.get(room);
   if (client && client.readyState === ws.OPEN) {
-    client.send(JSON.stringify({ type: 'switch-camera', mode: newMode }));
+    client.send(JSON.stringify({ type: 'switch-camera', mode: newMode }), (err) => {
+      if (err) {
+        console.error('Errore invio comando switch camera:', err);
+        return res.status(500).json({ error: 'Failed to notify client' });
+      }
+      res.json({ success: true, mode: newMode });
+    });
+  } else {
+    res.json({ success: false, error: 'Client not connected' });
   }
-
-  res.json({ success: true, mode: newMode });
 });
 
 // === ADMIN DASHBOARD (admin.html) ===
@@ -60,7 +66,7 @@ const adminHtml = `
   <script>
     const grid = document.getElementById('grid');
     const debug = document.getElementById('debug');
-    const ws = new WebSocket('wss://' + location.host + '/bg-admin');
+    let ws;
     const rooms = new Map();
     
     function log(msg) {
@@ -69,8 +75,60 @@ const adminHtml = `
       debug.appendChild(div);
       if (debug.children.length > 20) debug.removeChild(debug.firstChild);
     }
-
-    ws.onopen = () => log('WebSocket connesso');
+    
+    function connectWebSocket() {
+      ws = new WebSocket('wss://' + location.host + '/bg-admin');
+      
+      ws.onopen = () => {
+        log('WebSocket connesso');
+        // Aggiungi pulsante switch camera a tutte le stanze esistenti
+        rooms.forEach((div, roomId) => {
+          addSwitchButton(roomId);
+        });
+      };
+      
+      ws.onclose = () => {
+        log('WebSocket disconnesso - riconnessione...');
+        setTimeout(connectWebSocket, 3000);
+      };
+      
+      ws.onerror = (error) => {
+        log('Errore WebSocket: ' + error);
+      };
+      
+      return ws;
+    }
+    
+    function addSwitchButton(roomId) {
+      const div = rooms.get(roomId);
+      if (!div) return;
+      
+      // Rimuovi bottone esistente se presente
+      const oldBtn = div.querySelector('button');
+      if (oldBtn) oldBtn.remove();
+      
+      const btn = document.createElement('button');
+      btn.textContent = 'Cambia Camera';
+      btn.style.cssText = 'margin:8px; padding:5px 10px; background:#0f0; color:#000; border:none; border-radius:4px; cursor:pointer;';
+      btn.onclick = async () => {
+        try {
+          const response = await fetch(\`/api/switch-camera?room=\${roomId}\`, {
+            method: 'POST'
+          });
+          const result = await response.json();
+          if (result.success) {
+            log('Camera cambiata per ' + roomId);
+          } else {
+            throw new Error(result.error || 'Errore cambio camera');
+          }
+        } catch (err) {
+          log('Errore cambio camera: ' + err.message);
+        }
+      };
+      div.appendChild(btn);
+    }
+    
+    connectWebSocket();
 
     let lastRoom = null;
     
@@ -115,15 +173,23 @@ const adminHtml = `
               // Aggiorniamo il timestamp per debug
               const statusEl = document.getElementById('status-' + lastRoom);
               if (statusEl) {
-                statusEl.textContent = 'Live - Frame: ' + new Date().toLocaleTimeString();
+                const now = new Date().toLocaleTimeString();
+                statusEl.textContent = 'Live - Frame: ' + now;
+                statusEl.style.color = '#0f0'; // Verde per indicare attivo
               }
+              
               // Pulisci la vecchia URL quando l'immagine è caricata
+              const oldSrc = img.src;
               img.onload = () => {
-                URL.revokeObjectURL(img.src);
+                if (oldSrc) URL.revokeObjectURL(oldSrc);
                 log('Frame mostrato per ' + lastRoom);
               };
               img.onerror = (err) => {
                 log('Errore caricamento frame: ' + err);
+                if (statusEl) {
+                  statusEl.textContent = 'Errore frame: ' + err;
+                  statusEl.style.color = '#f00'; // Rosso per indicare errore
+                }
               };
               img.src = url;
             } else {
