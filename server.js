@@ -16,11 +16,12 @@ app.get('/admin', (req, res) => {
 const bgWss = new ws.Server({ noServer: true });
 const adminWss = new ws.Server({ noServer: true });
 
-const clients = new Map();
+const clients = new Map(); // room → ws
 
 bgWss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const room = url.searchParams.get('room') || 'unknown';
+  console.log(`📷 Camera connessa: ${room}`);
   clients.set(room, socket);
 
   socket.on('message', data => {
@@ -47,6 +48,7 @@ bgWss.on('connection', (socket, req) => {
 
   socket.on('close', () => {
     clients.delete(room);
+    console.log(`❌ Camera disconnessa: ${room}`);
     for (const admin of adminWss.clients) {
       if (admin.readyState === ws.OPEN) admin.send(JSON.stringify({ room, offline: true }));
     }
@@ -55,7 +57,7 @@ bgWss.on('connection', (socket, req) => {
 
 adminWss.on('connection', socket => socket.send(JSON.stringify({ type: 'welcome' })));
 
-const server = app.listen(PORT, () => console.log(`Server attivo su http://localhost:${PORT}`));
+const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
 
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;

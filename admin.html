@@ -8,9 +8,9 @@
 body { margin:0; background:#000; color:#0f0; font-family:Arial; padding:20px; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:15px; }
 .cam { border:2px solid #0f0; border-radius:12px; overflow:hidden; background:#111; position:relative; padding-bottom:50px; }
-.cam video { width:100%; display:block; margin-bottom:5px; }
+.cam video { width:100%; display:block; background:#000; }
 h2 { margin:0; padding:8px; background:#0f0; color:#000; font-size:14px; text-align:center; }
-.status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:35px; left:0; right:0; background:rgba(0,0,0,0.7); }
+.status { color:#0f0; font-size:12px; text-align:center; padding:4px; position:absolute; bottom:30px; left:0; right:0; background:rgba(0,0,0,0.7); }
 .controls { position:absolute; bottom:0; left:0; width:100%; text-align:center; padding:5px; background:rgba(0,0,0,0.9); }
 .controls button { background:#0f0; color:#000; border:none; padding:6px 12px; margin:0 5px; cursor:pointer; border-radius:6px; font-weight:bold; font-size:14px; }
 </style>
@@ -26,68 +26,55 @@ const ws = new WebSocket(`${protocol}://${location.host}/bg-admin`);
 const rooms = new Map();
 const mediaStreams = new Map();
 
-ws.onopen = () => console.log('Admin connesso');
+ws.onopen = () => console.log('✅ Admin connesso');
+
 ws.onmessage = async e => {
   if (typeof e.data === 'string') {
-    try {
-      const data = JSON.parse(e.data);
+    const data = JSON.parse(e.data);
+    if (data.room) {
       const room = data.room;
       if (!rooms.has(room)) {
-        // Crea container
         const div = document.createElement('div');
         div.className = 'cam';
         div.innerHTML = `
           <h2>${room}</h2>
-          <video id="video-${room}" autoplay playsinline muted></video>
-          <div class="status" id="status-${room}">Connesso</div>
+          <video id="video-${room}" autoplay playsinline controls></video>
+          <div class="status" id="status-${room}">Live</div>
           <div class="controls">
-            <button onclick="switchCamera('${room}','environment')">Posteriore</button>
-            <button onclick="switchCamera('${room}','user')">Frontale</button>
+            <button onclick="switchCam('${room}','user')">Front</button>
+            <button onclick="switchCam('${room}','environment')">Back</button>
           </div>
         `;
         grid.appendChild(div);
-        rooms.set(room, div);
 
-        // MediaSource
-        const videoEl = div.querySelector('video');
-        if ('MediaSource' in window) {
-          const mediaSource = new MediaSource();
-          videoEl.src = URL.createObjectURL(mediaSource);
-          const streamObj = { videoEl, mediaSource, queue: [], sourceBuffer:null, active:true };
-          mediaSource.addEventListener('sourceopen', () => {
-            try {
-              streamObj.sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
-              streamObj.sourceBuffer.addEventListener('updateend', () => processQueue(room));
-            } catch(e){ console.error(e); }
-          });
-          mediaStreams.set(room, streamObj);
+        const video = div.querySelector('video');
+        const mediaSource = new MediaSource();
+        video.src = URL.createObjectURL(mediaSource);
+        mediaSource.addEventListener('sourceopen', () => {
+          const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8,opus"');
+          mediaStreams.set(room, { mediaSource, sourceBuffer, queue: [], video });
+        });
+
+        rooms.set(room, div);
+      }
+    }
+  } else if (e.data instanceof Blob) {
+    // Trova il primo room che ha MediaSource pronto
+    mediaStreams.forEach(async (stream, room) => {
+      if (stream.sourceBuffer && !stream.sourceBuffer.updating) {
+        const arrayBuffer = await e.data.arrayBuffer();
+        try {
+          stream.sourceBuffer.appendBuffer(arrayBuffer);
+        } catch(e) {
+          console.warn('Errore appendBuffer', e);
         }
       }
-      document.getElementById('status-' + room).textContent = 'Live - ' + new Date(data.timestamp).toLocaleTimeString();
-    } catch{}
-  } else {
-    // Chunk WebM
-    const arrayBuffer = await e.data.arrayBuffer();
-    const room = Array.from(mediaStreams.keys())[0]; // semplice: primo room
-    const streamObj = mediaStreams.get(room);
-    if (streamObj && streamObj.sourceBuffer && !streamObj.sourceBuffer.updating) {
-      streamObj.queue.push(arrayBuffer);
-      processQueue(room);
-    }
+    });
   }
 };
 
-function processQueue(room){
-  const streamObj = mediaStreams.get(room);
-  if(!streamObj || !streamObj.sourceBuffer || streamObj.queue.length===0 || streamObj.sourceBuffer.updating) return;
-  const chunk = streamObj.queue.shift();
-  try { streamObj.sourceBuffer.appendBuffer(chunk); } catch(e){ console.error(e); }
-}
-
-function switchCamera(room,camera){
-  const clientWs = new WebSocket(`${protocol}://${location.host}/bg-admin`);
-  clientWs.onopen = ()=> clientWs.send(JSON.stringify({type:'switchCamera',camera}));
-  alert(`Inviato comando cambio fotocamera: ${camera}`);
+function switchCam(room, cam) {
+  ws.send(JSON.stringify({ type:'switchCamera', camera: cam }));
 }
 </script>
 </body>
