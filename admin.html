@@ -919,10 +919,10 @@ body {
   /* Simple Fullscreen Chat */
   .chat-fullscreen {
     position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    width: calc(100vw - 20px) !important;
-    height: calc(100vh - 20px) !important;
+    top: 20px !important;
+    left: 20px !important;
+    width: calc(100vw - 40px) !important;
+    height: calc(100vh - 40px) !important;
     background: white !important;
     z-index: 9999 !important;
     display: flex !important;
@@ -1035,6 +1035,31 @@ body {
     max-width: 200px !important;
   }
   
+  .chat-fullscreen .message-bubble {
+    background: #f0f0f0 !important;
+    padding: 10px 15px !important;
+    border-radius: 18px !important;
+    margin: 5px 0 !important;
+    max-width: 80% !important;
+    word-wrap: break-word !important;
+  }
+  
+  .chat-fullscreen .message.sent .message-bubble {
+    background: #dcf8c6 !important;
+    margin-left: auto !important;
+  }
+  
+  .chat-fullscreen .message.received .message-bubble {
+    background: #f0f0f0 !important;
+    margin-right: auto !important;
+  }
+  
+  .chat-fullscreen .message-time {
+    font-size: 11px !important;
+    color: #999 !important;
+    margin-top: 5px !important;
+  }
+  
   .chat-fullscreen .input-area {
     padding: 20px !important;
     background: white !important;
@@ -1060,6 +1085,26 @@ body {
     border-radius: 25px !important;
     cursor: pointer !important;
     font-size: 16px !important;
+  }
+  
+  .chat-fullscreen .attach-btn {
+    background: #25d366 !important;
+    color: white !important;
+    border: none !important;
+    padding: 15px !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    font-size: 18px !important;
+    width: 50px !important;
+    height: 50px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .chat-fullscreen .attach-btn:hover {
+    background: #128c7e !important;
   }
   
   .content-header {
@@ -1629,12 +1674,21 @@ function initializeWebSocket() {
         </div>
       </div>
       <div class="input-area">
+        <input type="file" id="fullscreenFileInput" accept="image/*,video/*,.pdf,.doc,.docx,.txt" style="display: none;">
+        <button class="attach-btn" id="fullscreenAttachBtn" onclick="openFullscreenFileInput()">📎</button>
         <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
         <button onclick="sendMessage()">Invia</button>
       </div>
     `;
     
     document.body.appendChild(chatPopup);
+    
+    // Setup file input for fullscreen chat
+    const fullscreenFileInput = document.getElementById('fullscreenFileInput');
+    if (fullscreenFileInput) {
+      fullscreenFileInput.addEventListener('change', handleFullscreenFileUpload);
+      console.log('📎 Fullscreen file input setup complete');
+    }
     
     // Focus on input
     setTimeout(() => {
@@ -1657,6 +1711,64 @@ function initializeWebSocket() {
     if (chat) {
       chat.remove();
     }
+  }
+
+  function openFullscreenFileInput() {
+    console.log('📎 Opening fullscreen file input');
+    const fileInput = document.getElementById('fullscreenFileInput');
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
+
+  async function handleFullscreenFileUpload(e) {
+    console.log('📎 Fullscreen file upload triggered');
+    const file = e.target.files[0];
+    if (!file) {
+      console.log('📎 No file selected');
+      return;
+    }
+    
+    console.log('📎 Uploading file:', file.name, file.type, file.size);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      console.log('📎 Sending file to server...');
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      console.log('📎 Upload response:', result);
+      
+      if (result.url) {
+        const attachment = {
+          type: file.type.startsWith('image/') ? 'image' : 'file',
+          url: result.url,
+          name: result.originalName
+        };
+        
+        const message = { 
+          type: 'chat', 
+          text: `📎 ${file.name}`,
+          room: selectedRoom,
+          attachment 
+        };
+        console.log('📎 Fullscreen sending file message:', message);
+        ws.send(JSON.stringify(message));
+        addFullscreenMessage('Tu', `📎 ${file.name}`, true, attachment);
+        console.log('📎 Fullscreen file message sent successfully');
+      } else {
+        console.error('📎 Upload failed - no URL returned');
+      }
+    } catch (err) {
+      console.error('📎 Upload error:', err);
+    }
+    
+    e.target.value = '';
   }
 
   function sendMessage() {
@@ -1878,6 +1990,8 @@ function initializeWebSocket() {
   window.sendFullscreenMessage = sendFullscreenMessage;
   window.sendMessage = sendMessage;
   window.addFullscreenMessage = addFullscreenMessage;
+  window.openFullscreenFileInput = openFullscreenFileInput;
+  window.handleFullscreenFileUpload = handleFullscreenFileUpload;
 
   function updateRoomsList(rooms) {
     console.log('🔄 Updating rooms list:', rooms);
@@ -2004,24 +2118,40 @@ function initializeWebSocket() {
     const adminAttachBtn = document.getElementById('adminAttachBtn');
     const adminFileInput = document.getElementById('adminFileInput');
     
-    adminAttachBtn.addEventListener('click', () => adminFileInput.click());
-    adminFileInput.addEventListener('change', handleAdminFileUpload);
+    if (adminAttachBtn && adminFileInput) {
+      console.log('📎 Setting up admin file attachment');
+      adminAttachBtn.addEventListener('click', () => {
+        console.log('📎 Admin attach button clicked');
+        adminFileInput.click();
+      });
+      adminFileInput.addEventListener('change', handleAdminFileUpload);
+    } else {
+      console.error('❌ Admin file attachment elements not found:', { adminAttachBtn, adminFileInput });
+    }
   }
   
   async function handleAdminFileUpload(e) {
+    console.log('📎 Admin file upload triggered');
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {
+      console.log('📎 No file selected');
+      return;
+    }
+    
+    console.log('📎 Uploading file:', file.name, file.type, file.size);
     
     const formData = new FormData();
     formData.append('file', file);
     
     try {
+      console.log('📎 Sending file to server...');
       const response = await fetch('/upload', {
         method: 'POST',
         body: formData
       });
       
       const result = await response.json();
+      console.log('📎 Upload response:', result);
       
       if (result.url) {
         const attachment = {
@@ -2036,12 +2166,15 @@ function initializeWebSocket() {
           room: selectedRoom,
           attachment 
         };
-        console.log('Admin sending file:', message);
+        console.log('📎 Admin sending file message:', message);
         ws.send(JSON.stringify(message));
         addMessage('Tu', `📎 ${file.name}`, true, attachment);
+        console.log('📎 File message sent successfully');
+      } else {
+        console.error('📎 Upload failed - no URL returned');
       }
     } catch (err) {
-      console.error('Upload error:', err);
+      console.error('📎 Upload error:', err);
     }
     
     adminFileInput.value = '';
