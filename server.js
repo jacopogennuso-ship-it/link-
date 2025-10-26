@@ -182,6 +182,8 @@ wss.on('connection', (ws, req)=>{
                 body: message.text,
                 icon: '/icons/icon-192x192.svg'
               }));
+              
+              console.log(`Push notification sent to room ${targetRoom}: ${message.text}`);
             }
           }
         }

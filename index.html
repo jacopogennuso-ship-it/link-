@@ -508,15 +508,27 @@ function setupChatFunctionality() {
       }
       
       if (data.type === 'pushNotification') {
+        console.log('Push notification received:', data);
+        
         // Show browser notification
         if (Notification.permission === 'granted') {
-          new Notification(data.title, {
+          const notification = new Notification(data.title, {
             body: data.body,
             icon: data.icon,
             badge: '/icons/icon-72x72.svg',
             tag: 'jacopo-chat',
             requireInteraction: true
           });
+          
+          // Handle notification click
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+          
+          console.log('Browser notification shown');
+        } else {
+          console.log('Notification permission not granted:', Notification.permission);
         }
       }
       
@@ -807,7 +819,14 @@ if ('serviceWorker' in navigator) {
 if ('Notification' in window) {
   Notification.requestPermission().then(permission => {
     console.log('Notification permission:', permission);
+    if (permission === 'granted') {
+      console.log('✅ Notifications enabled');
+    } else {
+      console.log('❌ Notifications disabled');
+    }
   });
+} else {
+  console.log('❌ Notifications not supported');
 }
 
 // PWA Install prompt

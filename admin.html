@@ -438,6 +438,60 @@ body {
   }
 }
 
+@media (max-width: 768px) {
+  .dashboard {
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  .sidebar {
+    height: 150px;
+    overflow-y: auto;
+  }
+  
+  .room-layout {
+    flex-direction: column !important;
+    height: calc(100vh - 150px) !important;
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+  
+  .video-section {
+    flex: 1 !important;
+    min-height: 200px !important;
+  }
+  
+  .video-container {
+    min-height: 200px !important;
+  }
+  
+  .video-wrapper {
+    min-height: 150px !important;
+  }
+  
+  .chat-section {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 200px !important;
+    max-height: 200px !important;
+  }
+  
+  .chat-messages {
+    max-height: 120px !important;
+  }
+  
+  .camera-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .camera-btn {
+    width: 100%;
+    padding: 10px;
+  }
+}
+
 /* Admin Login Styles */
 .admin-login-container {
   display: flex;
@@ -1042,6 +1096,11 @@ function initializeWebSocket() {
         // Create or reuse audio context
         if (!adminAudioContext || adminAudioContext.state === 'closed') {
           adminAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Resume audio context if suspended (required for mobile)
+        if (adminAudioContext.state === 'suspended') {
+          await adminAudioContext.resume();
         }
         
         // Convert base64 back to audio buffer
