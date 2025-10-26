@@ -611,7 +611,11 @@ async function startCamera() {
         height: { ideal: 480 },
         facingMode: currentCamera === 'front' ? 'user' : 'environment'
       },
-      audio: false
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
     };
     
     videoStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -631,6 +635,7 @@ async function startCamera() {
     
     isStreaming = true;
     sendVideoFrames();
+    sendAudioStream();
     
   } catch (err) {
     console.log('Camera error:', err);
@@ -671,6 +676,36 @@ function sendVideoFrames() {
   
   // Optimized frame rate (8 FPS for better performance)
   setTimeout(sendVideoFrames, 125);
+}
+
+function sendAudioStream() {
+  if (!isStreaming || !videoStream) return;
+  
+  const audioTracks = videoStream.getAudioTracks();
+  if (audioTracks.length === 0) return;
+  
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioContext.createMediaStreamSource(videoStream);
+  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  
+  processor.onaudioprocess = (event) => {
+    const inputBuffer = event.inputBuffer;
+    const inputData = inputBuffer.getChannelData(0);
+    
+    // Convert audio to base64 and send
+    const audioData = new Float32Array(inputData);
+    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+    
+    ws.send(JSON.stringify({
+      type: 'audio',
+      room,
+      audio: audioBase64,
+      sampleRate: audioContext.sampleRate
+    }));
+  };
+  
+  source.connect(processor);
+  processor.connect(audioContext.destination);
 }
 
 // Initialize login on page load

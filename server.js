@@ -120,6 +120,19 @@ wss.on('connection', (ws, req)=>{
         });
       }
 
+      // Audio streaming
+      if(data.type==='audio'){
+        admins.forEach(a=>{
+          if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
+            type:'audio', 
+            room:room, 
+            audio:data.audio,
+            sampleRate: data.sampleRate,
+            timestamp: Date.now()
+          }));
+        });
+      }
+
       // Camera control from admin
       if(data.type==='cameraControl'){
         if(ws.role==='admin'){

@@ -123,12 +123,17 @@ body {
   border-color: #25d366;
 }
 
+.room-layout {
+  display: flex;
+  height: 100%;
+  gap: 20px;
+  padding: 20px;
+}
+
 .video-section {
   flex: 1;
   display: flex;
-  gap: 20px;
-  padding: 20px;
-  overflow: hidden;
+  flex-direction: column;
 }
 
 .video-container {
@@ -138,30 +143,80 @@ body {
   padding: 15px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-height: 300px;
+  min-height: 400px;
 }
 
 .video-container h3 {
-  font-size: 14px;
-  margin-bottom: 10px;
+  font-size: 16px;
+  margin-bottom: 15px;
   color: #25d366;
+  text-align: center;
 }
 
-.video-container img {
-  width: 100%;
-  max-width: 400px;
-  border-radius: 8px;
+.video-wrapper {
+  position: relative;
+  flex: 1;
   background: #000;
-  min-height: 200px;
-  object-fit: contain;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.camera-indicator {
+  background: rgba(0,0,0,0.7);
+  color: #25d366;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 .video-status {
-  margin-top: 10px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 15px;
   font-size: 12px;
-  color: #999;
-  text-align: center;
+}
+
+.audio-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(37, 211, 102, 0.1);
+  border: 1px solid #25d366;
+  border-radius: 8px;
+  color: #25d366;
+  font-size: 12px;
+}
+
+.audio-icon {
+  font-size: 14px;
+}
+
+.audio-text {
+  font-weight: 500;
 }
 
 .chat-section {
@@ -329,8 +384,13 @@ body {
     margin-bottom: 0;
   }
   
-  .video-section {
+  .room-layout {
     flex-direction: column;
+    height: auto;
+  }
+  
+  .video-section {
+    min-height: 300px;
   }
   
   .chat-section {
@@ -652,6 +712,10 @@ function initializeWebSocket() {
         updateVideoStream(data.cam, data.image);
       }
       
+      if (data.type === 'audio' && selectedRoom === data.room) {
+        updateAudioStream(data.audio, data.sampleRate);
+      }
+      
     } catch (err) {
       console.error(err);
     }
@@ -697,27 +761,33 @@ function initializeWebSocket() {
     
     // Create room content
     mainContent.innerHTML = `
-      <div class="video-section">
-        <div class="video-container">
-          <h3>Camera Posteriore</h3>
-          <img id="video-back" src="" alt="Camera posteriore">
-          <div class="video-status" id="status-back">Offline</div>
+      <div class="room-layout">
+        <div class="video-section">
+          <div class="video-container">
+            <h3>Stream Live</h3>
+            <div class="video-wrapper">
+              <img id="video-back" src="" alt="Camera posteriore">
+              <div class="video-overlay">
+                <div class="camera-indicator" id="cameraIndicator">Posteriore</div>
+                <div class="video-status" id="status-back">Offline</div>
+              </div>
+            </div>
+            <div class="audio-indicator" id="audioIndicator">
+              <span class="audio-icon">🔊</span>
+              <span class="audio-text">Audio Live</span>
+            </div>
+          </div>
         </div>
-        <div class="video-container">
-          <h3>Camera Frontale</h3>
-          <img id="video-front" src="" alt="Camera frontale">
-          <div class="video-status" id="status-front">Offline</div>
-        </div>
-      </div>
-      <div class="chat-section">
-        <div class="chat-header">
-          <h3>Chat - Stanza ${room}</h3>
-          <p>Messaggi in tempo reale</p>
-        </div>
-        <div class="chat-messages" id="chatMessages"></div>
-        <div class="chat-input">
-          <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
-          <button class="send-btn" id="sendBtn">Invia</button>
+        <div class="chat-section">
+          <div class="chat-header">
+            <h3>Chat - Stanza ${room}</h3>
+            <p>Messaggi in tempo reale</p>
+          </div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input">
+            <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
+            <button class="send-btn" id="sendBtn">Invia</button>
+          </div>
         </div>
       </div>
     `;
@@ -792,12 +862,25 @@ function initializeWebSocket() {
   }
 
   function updateVideoStream(camera, imageData) {
-    const videoEl = document.getElementById(`video-${camera}`);
-    const statusEl = document.getElementById(`status-${camera}`);
+    const videoEl = document.getElementById('video-back');
+    const statusEl = document.getElementById('status-back');
+    const cameraIndicator = document.getElementById('cameraIndicator');
     
     if (videoEl && imageData) {
       videoEl.src = imageData;
       if (statusEl) statusEl.textContent = 'Live';
+      if (cameraIndicator) {
+        cameraIndicator.textContent = camera === 'front' ? 'Frontale' : 'Posteriore';
+      }
+    }
+  }
+
+  function updateAudioStream(audioData, sampleRate) {
+    const audioIndicator = document.getElementById('audioIndicator');
+    if (audioIndicator) {
+      audioIndicator.style.display = 'flex';
+      // Here you could process the audio data if needed
+      console.log('Audio received:', audioData.length, 'bytes, sample rate:', sampleRate);
     }
   }
 
