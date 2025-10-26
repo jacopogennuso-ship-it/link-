@@ -479,19 +479,22 @@ function setupChatFunctionality() {
   ws.addEventListener('message', e => {
     try {
       const data = JSON.parse(e.data);
+      console.log('Client received:', data);
       
       if (data.type === 'chat') {
+        console.log('Adding message from:', data.from, 'text:', data.text);
         addMessage(data.from, data.text, false, data.attachment, data.timestamp);
       }
       
       if (data.type === 'cameraControl') {
+        console.log('Camera control received:', data.camera);
         if (data.camera !== currentCamera) {
           currentCamera = data.camera;
           startCamera();
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error processing message:', err);
     }
   });
 

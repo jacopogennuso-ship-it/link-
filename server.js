@@ -92,8 +92,10 @@ wss.on('connection', (ws, req)=>{
             }));
           });
         } else if(ws.role==='admin'){
-          if(room && clients.has(room)){
-            const c=clients.get(room);
+          // Admin can send to specific room or broadcast to all
+          const targetRoom = data.room || ws.selectedRoom;
+          if(targetRoom && clients.has(targetRoom)){
+            const c=clients.get(targetRoom);
             if(c.readyState===ws.OPEN) c.send(JSON.stringify({ 
               type:'chat', 
               from:'Admin', 
@@ -120,14 +122,18 @@ wss.on('connection', (ws, req)=>{
 
       // Camera control from admin
       if(data.type==='cameraControl'){
-        if(ws.role==='admin' && data.targetRoom && clients.has(data.targetRoom)){
-          const client = clients.get(data.targetRoom);
-          if(client.readyState===ws.OPEN) {
-            client.send(JSON.stringify({ 
-              type:'cameraControl', 
-              camera: data.camera,
-              quality: data.quality || 'medium'
-            }));
+        if(ws.role==='admin'){
+          const targetRoom = data.targetRoom || ws.selectedRoom;
+          if(targetRoom && clients.has(targetRoom)){
+            const client = clients.get(targetRoom);
+            if(client.readyState===ws.OPEN) {
+              client.send(JSON.stringify({ 
+                type:'cameraControl', 
+                camera: data.camera,
+                quality: data.quality || 'medium'
+              }));
+              console.log(`Camera control sent to room ${targetRoom}: ${data.camera}`);
+            }
           }
         }
       }

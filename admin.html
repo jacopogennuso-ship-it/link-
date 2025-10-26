@@ -338,14 +338,170 @@ body {
     height: 300px;
   }
 }
+
+/* Admin Login Styles */
+.admin-login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  padding: 20px;
+}
+
+.admin-login-card {
+  background: #1a1a1a;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  border: 1px solid #333;
+}
+
+.admin-login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.admin-login-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  margin: 0 auto 20px;
+  box-shadow: 0 10px 20px rgba(255, 107, 107, 0.2);
+}
+
+.admin-login-header h1 {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+.admin-login-header p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#adminUsername, #adminPassword {
+  background: #2a2a2a;
+  border: 2px solid #444;
+  color: #fff;
+  padding: 15px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+#adminUsername:focus, #adminPassword:focus {
+  border-color: #ff6b6b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+}
+
+#adminUsername::placeholder, #adminPassword::placeholder {
+  color: #999;
+}
+
+.admin-login-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  border: none;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+}
+
+.admin-login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+}
+
+.admin-login-btn:active {
+  transform: translateY(0);
+}
+
+.login-error {
+  background: #ff4444;
+  color: white;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.logout-btn {
+  background: #ff4444;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+}
+
+.logout-btn:hover {
+  background: #cc3333;
+}
+
+@media (max-width: 480px) {
+  .admin-login-card {
+    padding: 30px 20px;
+    margin: 10px;
+  }
+  
+  .admin-login-header h1 {
+    font-size: 20px;
+  }
+}
 </style>
 </head>
 <body>
-<div class="dashboard">
+<!-- Admin Login Screen -->
+<div class="admin-login-container" id="adminLoginContainer">
+  <div class="admin-login-card">
+    <div class="admin-login-header">
+      <div class="admin-login-avatar">🔐</div>
+      <h1>Admin Login</h1>
+      <p>Inserisci le credenziali per accedere</p>
+    </div>
+    <div class="admin-login-form">
+      <input type="text" id="adminUsername" placeholder="Nome utente..." maxlength="20">
+      <input type="password" id="adminPassword" placeholder="Password..." maxlength="30">
+      <button id="adminLoginBtn" class="admin-login-btn">Accedi</button>
+      <div id="loginError" class="login-error" style="display: none;">
+        Credenziali non valide
+      </div>
+  </div>
+  </div>
+</div>
+
+<!-- Admin Dashboard -->
+<div class="dashboard" id="adminDashboard" style="display: none;">
   <div class="sidebar">
     <div class="sidebar-header">
       <h1>Admin Dashboard</h1>
       <p id="connectionStatus">Connesso</p>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
     </div>
     <div class="rooms-list" id="roomsList">
       <!-- Rooms will be populated here -->
@@ -370,7 +526,22 @@ body {
 </div>
 
 <script>
-const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=admin`);
+// Admin credentials
+const ADMIN_CREDENTIALS = {
+  username: 'jacopo',
+  password: 'testadipioppo'
+};
+
+// Login elements
+const adminLoginContainer = document.getElementById('adminLoginContainer');
+const adminDashboard = document.getElementById('adminDashboard');
+const adminUsername = document.getElementById('adminUsername');
+const adminPassword = document.getElementById('adminPassword');
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const loginError = document.getElementById('loginError');
+const logoutBtn = document.getElementById('logoutBtn');
+
+// Dashboard elements
 const connectionStatus = document.getElementById('connectionStatus');
 const roomsList = document.getElementById('roomsList');
 const selectedRoomTitle = document.getElementById('selectedRoomTitle');
@@ -382,218 +553,291 @@ const backCameraBtn = document.getElementById('backCameraBtn');
 let selectedRoom = null;
 let currentCamera = 'back';
 let videoStreams = {};
+let ws = null;
 
-// Connection status
-ws.addEventListener('open', () => {
-  connectionStatus.textContent = 'Connesso';
-});
-
-ws.addEventListener('close', () => {
-  connectionStatus.textContent = 'Disconnesso';
-});
-
-ws.addEventListener('error', () => {
-  connectionStatus.textContent = 'Errore';
-});
-
-// Handle WebSocket messages
-ws.addEventListener('message', e => {
-  try {
-    const data = JSON.parse(e.data);
-    
-    if (data.type === 'roomsList') {
-      updateRoomsList(data.rooms);
-    }
-    
-    if (data.type === 'clientConnected') {
-      updateRoomsList([...Array.from(new Set([...getCurrentRooms(), data.room]))]);
-    }
-    
-    if (data.type === 'clientDisconnected') {
-      updateRoomsList(getCurrentRooms().filter(room => room !== data.room));
-    }
-    
-    if (data.type === 'chat' && selectedRoom === data.from) {
-      addMessage(data.from, data.text, false, data.attachment, data.timestamp);
-    }
-    
-    if (data.type === 'video' && selectedRoom === data.room) {
-      updateVideoStream(data.cam, data.image);
-    }
-    
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-function getCurrentRooms() {
-  return Array.from(roomsList.querySelectorAll('.room-item')).map(item => item.dataset.room);
+// Initialize admin login
+function initializeAdminLogin() {
+  adminLoginBtn.addEventListener('click', handleAdminLogin);
+  adminPassword.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleAdminLogin();
+  });
+  
+  // Auto-focus on username
+  adminUsername.focus();
 }
 
-function updateRoomsList(rooms) {
-  roomsList.innerHTML = '';
+function handleAdminLogin() {
+  const username = adminUsername.value.trim();
+  const password = adminPassword.value.trim();
   
-  if (rooms.length === 0) {
-    roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
+  if (!username || !password) {
+    showLoginError('Inserisci username e password');
     return;
   }
   
-  rooms.forEach(room => {
-    const roomEl = document.createElement('div');
-    roomEl.className = 'room-item';
-    roomEl.dataset.room = room;
-    roomEl.innerHTML = `
-      <h3>Stanza ${room}</h3>
-      <p>Online</p>
+  if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    // Login successful
+    adminLoginContainer.style.display = 'none';
+    adminDashboard.style.display = 'flex';
+    
+    // Initialize WebSocket connection
+    initializeWebSocket();
+  } else {
+    showLoginError('Credenziali non valide');
+  }
+}
+
+function showLoginError(message) {
+  loginError.textContent = message;
+  loginError.style.display = 'block';
+  adminUsername.style.borderColor = '#ff4444';
+  adminPassword.style.borderColor = '#ff4444';
+  
+  setTimeout(() => {
+    loginError.style.display = 'none';
+    adminUsername.style.borderColor = '#444';
+    adminPassword.style.borderColor = '#444';
+  }, 3000);
+}
+
+function handleLogout() {
+  if (ws) {
+    ws.close();
+  }
+  adminLoginContainer.style.display = 'flex';
+  adminDashboard.style.display = 'none';
+  adminUsername.value = '';
+  adminPassword.value = '';
+  adminUsername.focus();
+}
+
+function initializeWebSocket() {
+  ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=admin`);
+
+  // Connection status
+  ws.addEventListener('open', () => {
+    connectionStatus.textContent = 'Connesso';
+  });
+
+  ws.addEventListener('close', () => {
+    connectionStatus.textContent = 'Disconnesso';
+  });
+
+  ws.addEventListener('error', () => {
+    connectionStatus.textContent = 'Errore';
+  });
+
+  // Handle WebSocket messages
+  ws.addEventListener('message', e => {
+    try {
+      const data = JSON.parse(e.data);
+    
+      if (data.type === 'roomsList') {
+        updateRoomsList(data.rooms);
+      }
+      
+      if (data.type === 'clientConnected') {
+        updateRoomsList([...Array.from(new Set([...getCurrentRooms(), data.room]))]);
+      }
+      
+      if (data.type === 'clientDisconnected') {
+        updateRoomsList(getCurrentRooms().filter(room => room !== data.room));
+      }
+      
+      if (data.type === 'chat' && selectedRoom === data.from) {
+        addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+      }
+      
+      if (data.type === 'video' && selectedRoom === data.room) {
+        updateVideoStream(data.cam, data.image);
+      }
+      
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  function getCurrentRooms() {
+    return Array.from(roomsList.querySelectorAll('.room-item')).map(item => item.dataset.room);
+  }
+
+  function updateRoomsList(rooms) {
+    roomsList.innerHTML = '';
+    
+    if (rooms.length === 0) {
+      roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
+      return;
+    }
+    
+    rooms.forEach(room => {
+      const roomEl = document.createElement('div');
+      roomEl.className = 'room-item';
+      roomEl.dataset.room = room;
+      roomEl.innerHTML = `
+        <h3>Stanza ${room}</h3>
+        <p>Online</p>
+      `;
+      
+      roomEl.addEventListener('click', () => selectRoom(room));
+      roomsList.appendChild(roomEl);
+    });
+  }
+
+  function selectRoom(room) {
+    selectedRoom = room;
+    
+    // Update UI
+    document.querySelectorAll('.room-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    document.querySelector(`[data-room="${room}"]`).classList.add('active');
+    
+    selectedRoomTitle.textContent = `Stanza ${room}`;
+    cameraControls.style.display = 'flex';
+    
+    // Create room content
+    mainContent.innerHTML = `
+      <div class="video-section">
+        <div class="video-container">
+          <h3>Camera Posteriore</h3>
+          <img id="video-back" src="" alt="Camera posteriore">
+          <div class="video-status" id="status-back">Offline</div>
+        </div>
+        <div class="video-container">
+          <h3>Camera Frontale</h3>
+          <img id="video-front" src="" alt="Camera frontale">
+          <div class="video-status" id="status-front">Offline</div>
+        </div>
+      </div>
+      <div class="chat-section">
+        <div class="chat-header">
+          <h3>Chat - Stanza ${room}</h3>
+          <p>Messaggi in tempo reale</p>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input">
+          <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
+          <button class="send-btn" id="sendBtn">Invia</button>
+        </div>
+      </div>
     `;
     
-    roomEl.addEventListener('click', () => selectRoom(room));
-    roomsList.appendChild(roomEl);
-  });
-}
-
-function selectRoom(room) {
-  selectedRoom = room;
-  
-  // Update UI
-  document.querySelectorAll('.room-item').forEach(item => {
-    item.classList.remove('active');
-  });
-  document.querySelector(`[data-room="${room}"]`).classList.add('active');
-  
-  selectedRoomTitle.textContent = `Stanza ${room}`;
-  cameraControls.style.display = 'flex';
-  
-  // Create room content
-  mainContent.innerHTML = `
-    <div class="video-section">
-      <div class="video-container">
-        <h3>Camera Posteriore</h3>
-        <img id="video-back" src="" alt="Camera posteriore">
-        <div class="video-status" id="status-back">Offline</div>
-      </div>
-      <div class="video-container">
-        <h3>Camera Frontale</h3>
-        <img id="video-front" src="" alt="Camera frontale">
-        <div class="video-status" id="status-front">Offline</div>
-      </div>
-    </div>
-    <div class="chat-section">
-      <div class="chat-header">
-        <h3>Chat - Stanza ${room}</h3>
-        <p>Messaggi in tempo reale</p>
-      </div>
-      <div class="chat-messages" id="chatMessages"></div>
-      <div class="chat-input">
-        <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
-        <button class="send-btn" id="sendBtn">Invia</button>
-      </div>
-    </div>
-  `;
-  
-  // Setup chat functionality
-  setupChat();
-  
-  // Notify server about room selection
-  ws.send(JSON.stringify({ type: 'selectRoom', room }));
-}
-
-function setupChat() {
-  const chatInput = document.getElementById('chatInput');
-  const sendBtn = document.getElementById('sendBtn');
-  
-  function sendMessage() {
-    const text = chatInput.value.trim();
-    if (!text) return;
+    // Setup chat functionality
+    setupChat();
     
-    ws.send(JSON.stringify({ type: 'chat', text, room: selectedRoom }));
-    addMessage('Tu', text, true);
-    chatInput.value = '';
+    // Notify server about room selection
+    ws.send(JSON.stringify({ type: 'selectRoom', room }));
   }
-  
-  sendBtn.addEventListener('click', sendMessage);
-  chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-  });
-}
 
-function addMessage(from, text, me = false, attachment = null, timestamp = null) {
-  const chatMessages = document.getElementById('chatMessages');
-  if (!chatMessages) return;
-  
-  const messageEl = document.createElement('div');
-  messageEl.className = `message ${me ? 'sent' : 'received'}`;
-  
-  const bubbleEl = document.createElement('div');
-  bubbleEl.className = 'message-bubble';
-  
-  if (text) {
-    bubbleEl.innerHTML = `<div>${text}</div>`;
-  }
-  
-  if (attachment) {
-    const attachmentEl = document.createElement('div');
-    attachmentEl.className = 'attachment';
+  function setupChat() {
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
     
-    if (attachment.type === 'image') {
-      attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
-    } else {
-      attachmentEl.innerHTML = `
-        <div class="attachment-file">
-          <span>📎</span>
-          <span>${attachment.name}</span>
-        </div>
-      `;
+    function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      
+      const message = { type: 'chat', text, room: selectedRoom };
+      console.log('Admin sending message:', message);
+      ws.send(JSON.stringify(message));
+      addMessage('Tu', text, true);
+      chatInput.value = '';
     }
-    bubbleEl.appendChild(attachmentEl);
+    
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
   }
-  
-  const timeEl = document.createElement('div');
-  timeEl.className = 'message-time';
-  timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
-  bubbleEl.appendChild(timeEl);
-  
-  messageEl.appendChild(bubbleEl);
-  chatMessages.appendChild(messageEl);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  function addMessage(from, text, me = false, attachment = null, timestamp = null) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = `message ${me ? 'sent' : 'received'}`;
+    
+    const bubbleEl = document.createElement('div');
+    bubbleEl.className = 'message-bubble';
+    
+    if (text) {
+      bubbleEl.innerHTML = `<div>${text}</div>`;
+    }
+    
+    if (attachment) {
+      const attachmentEl = document.createElement('div');
+      attachmentEl.className = 'attachment';
+      
+      if (attachment.type === 'image') {
+        attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
+      } else {
+        attachmentEl.innerHTML = `
+          <div class="attachment-file">
+            <span>📎</span>
+            <span>${attachment.name}</span>
+          </div>
+        `;
+      }
+      bubbleEl.appendChild(attachmentEl);
+    }
+    
+    const timeEl = document.createElement('div');
+    timeEl.className = 'message-time';
+    timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+    bubbleEl.appendChild(timeEl);
+    
+    messageEl.appendChild(bubbleEl);
+    chatMessages.appendChild(messageEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateVideoStream(camera, imageData) {
+    const videoEl = document.getElementById(`video-${camera}`);
+    const statusEl = document.getElementById(`status-${camera}`);
+    
+    if (videoEl && imageData) {
+      videoEl.src = imageData;
+      if (statusEl) statusEl.textContent = 'Live';
+    }
+  }
+
+  // Camera controls
+  frontCameraBtn.addEventListener('click', () => {
+    if (selectedRoom) {
+      currentCamera = 'front';
+      frontCameraBtn.classList.add('active');
+      backCameraBtn.classList.remove('active');
+      const message = { 
+        type: 'cameraControl', 
+        targetRoom: selectedRoom, 
+        camera: 'front' 
+      };
+      console.log('Admin sending camera control:', message);
+      ws.send(JSON.stringify(message));
+    }
+  });
+
+  backCameraBtn.addEventListener('click', () => {
+    if (selectedRoom) {
+      currentCamera = 'back';
+      backCameraBtn.classList.add('active');
+      frontCameraBtn.classList.remove('active');
+      const message = { 
+        type: 'cameraControl', 
+        targetRoom: selectedRoom, 
+        camera: 'back' 
+      };
+      console.log('Admin sending camera control:', message);
+      ws.send(JSON.stringify(message));
+    }
+  });
+
+  // Setup logout button
+  logoutBtn.addEventListener('click', handleLogout);
 }
 
-function updateVideoStream(camera, imageData) {
-  const videoEl = document.getElementById(`video-${camera}`);
-  const statusEl = document.getElementById(`status-${camera}`);
-  
-  if (videoEl && imageData) {
-    videoEl.src = imageData;
-    if (statusEl) statusEl.textContent = 'Live';
-  }
-}
-
-// Camera controls
-frontCameraBtn.addEventListener('click', () => {
-  if (selectedRoom) {
-    currentCamera = 'front';
-    frontCameraBtn.classList.add('active');
-    backCameraBtn.classList.remove('active');
-    ws.send(JSON.stringify({ 
-      type: 'cameraControl', 
-      targetRoom: selectedRoom, 
-      camera: 'front' 
-    }));
-  }
-});
-
-backCameraBtn.addEventListener('click', () => {
-  if (selectedRoom) {
-    currentCamera = 'back';
-    backCameraBtn.classList.add('active');
-    frontCameraBtn.classList.remove('active');
-    ws.send(JSON.stringify({ 
-      type: 'cameraControl', 
-      targetRoom: selectedRoom, 
-      camera: 'back' 
-    }));
-  }
-});
+// Initialize admin login on page load
+initializeAdminLogin();
 </script>
 </body>
 </html>
