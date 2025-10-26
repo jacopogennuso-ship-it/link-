@@ -542,7 +542,7 @@ body {
   }
   
   .room-layout {
-    flex-direction: column !important;
+    flex-direction: row !important;
     height: calc(100vh - 120px) !important;
     padding: 5px !important;
     gap: 5px !important;
@@ -550,11 +550,11 @@ body {
   }
   
   .video-section {
-    flex: 0 0 40% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    min-height: 150px !important;
-    max-height: 40vh !important;
+    flex: 0 0 50% !important;
+    min-width: 50% !important;
+    max-width: 50% !important;
+    min-height: 200px !important;
+    max-height: 100% !important;
     overflow: hidden !important;
   }
   
@@ -576,11 +576,11 @@ body {
   }
   
   .chat-section {
-    flex: 1 !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    height: 60% !important;
-    max-height: 60vh !important;
+    flex: 0 0 50% !important;
+    min-width: 50% !important;
+    max-width: 50% !important;
+    height: 100% !important;
+    max-height: 100% !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
@@ -588,7 +588,7 @@ body {
   
   .chat-messages {
     flex: 1 !important;
-    max-height: calc(60vh - 50px) !important;
+    max-height: calc(100% - 50px) !important;
     overflow-y: auto !important;
     padding: 5px !important;
     font-size: 12px !important;
@@ -671,15 +671,18 @@ body {
   }
   
   .room-layout {
+    flex-direction: row !important;
     height: calc(100vh - 100px) !important;
     padding: 3px !important;
     gap: 3px !important;
   }
   
   .video-section {
-    flex: 0 0 35% !important;
+    flex: 0 0 50% !important;
+    min-width: 50% !important;
+    max-width: 50% !important;
     min-height: 120px !important;
-    max-height: 35vh !important;
+    max-height: 100% !important;
   }
   
   .video-container {
@@ -692,12 +695,16 @@ body {
   }
   
   .chat-section {
-    height: 65% !important;
-    max-height: 65vh !important;
+    flex: 0 0 50% !important;
+    min-width: 50% !important;
+    max-width: 50% !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
   
   .chat-messages {
-    max-height: calc(65vh - 45px) !important;
+    flex: 1 !important;
+    max-height: calc(100% - 45px) !important;
     padding: 3px !important;
     font-size: 11px !important;
   }
@@ -1131,12 +1138,11 @@ function checkAdminSession() {
       adminDashboard.style.display = 'flex';
       initializeWebSocket();
       
-      // Restore selected room if exists
+      // Restore selected room if exists - will be handled after WebSocket is ready
       const savedRoom = localStorage.getItem('adminSelectedRoom');
       if (savedRoom) {
-        setTimeout(() => {
-          selectRoom(savedRoom);
-        }, 1000); // Wait for WebSocket to be ready
+        // Store for later use
+        window.pendingRoomSelection = savedRoom;
       }
       
       return true;
@@ -1161,6 +1167,14 @@ function initializeWebSocket() {
     
     // Start admin heartbeat
     startAdminHeartbeat();
+    
+    // Handle pending room selection
+    if (window.pendingRoomSelection) {
+      setTimeout(() => {
+        selectRoom(window.pendingRoomSelection);
+        window.pendingRoomSelection = null;
+      }, 500);
+    }
   });
 
   ws.addEventListener('close', (event) => {
