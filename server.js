@@ -238,6 +238,34 @@ async function sendPushNotification(room, title, message) {
   }
 }
 
+// Send push notification to specific subscription
+async function sendPushNotificationToSubscription(subscription, title, message, room = null) {
+  try {
+    if (!subscription) {
+      console.log(`❌ No push subscription provided`);
+      return;
+    }
+    
+    const payload = JSON.stringify({
+      title: title,
+      body: message,
+      icon: '/icons/icon-192x192.svg',
+      badge: '/icons/icon-72x72.svg',
+      tag: 'jacopo-chat',
+      requireInteraction: true,
+      data: {
+        room: room,
+        timestamp: Date.now()
+      }
+    });
+    
+    await webpush.sendNotification(subscription, payload);
+    console.log(`📤 Push notification sent: ${message}`);
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
+}
+
 // Load data on startup
 loadChatHistory();
 loadRoomsData();
@@ -366,11 +394,39 @@ wss.on('connection', (ws, req)=>{
         if(ws.role==='client'){
           // Send client message to all admins
           admins.forEach(a=>{
-            if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
-              type:'chat', 
-              ...message
-            }));
+            if(a.readyState===ws.OPEN) {
+              a.send(JSON.stringify({ 
+                type:'chat', 
+                ...message
+              }));
+              
+              // Send push notification to admin
+              a.send(JSON.stringify({
+                type: 'pushNotification',
+                title: `Nuovo messaggio da ${room}`,
+                body: message.text,
+                icon: '/icons/icon-192x192.svg',
+                badge: '/icons/icon-72x72.svg'
+              }));
+              
+              // Also send a visual notification for in-app display
+              a.send(JSON.stringify({
+                type: 'visualNotification',
+                title: `Nuovo messaggio da ${room}`,
+                body: message.text,
+                timestamp: Date.now()
+              }));
+            }
           });
+          
+          // Send real push notification (external) to all admins
+          for (const admin of admins) {
+            if (admin.pushSubscription) {
+              sendPushNotificationToSubscription(admin.pushSubscription, `Nuovo messaggio da ${room}`, message.text, room)
+                .then(() => console.log(`📤 Push notification sent to admin: ${message.text}`))
+                .catch(err => console.error('Error sending push notification to admin:', err));
+            }
+          }
         } else if(ws.role==='admin'){
           // Admin can send to specific room or broadcast to all
           const targetRoom = data.room || ws.selectedRoom;
@@ -399,10 +455,16 @@ wss.on('connection', (ws, req)=>{
                 timestamp: Date.now()
               }));
               
-              // Send real push notification (external)
-              sendPushNotification(targetRoom, 'Nuovo messaggio da Admin', message.text);
-              
-              console.log(`📤 Push notification sent to room ${targetRoom}: ${message.text}`);
+              // Send real push notification (external) to client
+              if (c.pushSubscription) {
+                sendPushNotificationToSubscription(c.pushSubscription, 'Nuovo messaggio da Admin', message.text, targetRoom)
+                  .then(() => console.log(`📤 Push notification sent to client: ${message.text}`))
+                  .catch(err => console.error('Error sending push notification to client:', err));
+              } else {
+                // Fallback to room-based notification
+                sendPushNotification(targetRoom, 'Nuovo messaggio da Admin', message.text);
+                console.log(`📤 Push notification sent to room ${targetRoom}: ${message.text}`);
+              }
             }
           }
           
@@ -435,6 +497,19 @@ wss.on('connection', (ws, req)=>{
           }));
           const userType = ws.role === 'admin' ? 'admin' : 'client';
           console.log(`📚 No chat history found for room ${targetRoom} (${userType})`);
+        }
+      }
+
+      // Handle push subscription registration
+      if(data.type==='pushSubscription'){
+        if(ws.role==='client'){
+          // Store client push subscription
+          ws.pushSubscription = data.subscription;
+          console.log(`📱 Client push subscription registered for room ${room}`);
+        } else if(ws.role==='admin'){
+          // Store admin push subscription
+          ws.pushSubscription = data.subscription;
+          console.log(`👨‍💼 Admin push subscription registered`);
         }
       }
 

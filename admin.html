@@ -919,14 +919,17 @@ body {
   /* Simple Fullscreen Chat */
   .chat-fullscreen {
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    top: 10px !important;
+    left: 10px !important;
+    width: calc(100vw - 20px) !important;
+    height: calc(100vh - 20px) !important;
     background: white !important;
     z-index: 9999 !important;
     display: flex !important;
     flex-direction: column !important;
+    border-radius: 10px !important;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+    overflow: hidden !important;
   }
   
   .chat-fullscreen .header {
@@ -1065,6 +1068,42 @@ body {
   
   .content-header h2 {
     font-size: 12px !important;
+  }
+  
+  /* Responsive fullscreen chat for small devices */
+  @media (max-width: 480px) {
+    .chat-fullscreen {
+      top: 5px !important;
+      left: 5px !important;
+      width: calc(100vw - 10px) !important;
+      height: calc(100vh - 10px) !important;
+      border-radius: 5px !important;
+    }
+    
+    .chat-fullscreen .header {
+      padding: 15px !important;
+    }
+    
+    .chat-fullscreen .header h2 {
+      font-size: 18px !important;
+    }
+    
+    .chat-fullscreen .messages {
+      padding: 15px !important;
+    }
+    
+    .chat-fullscreen .input-area {
+      padding: 15px !important;
+    }
+  }
+  
+  @media (max-height: 600px) {
+    .chat-fullscreen {
+      top: 5px !important;
+      left: 5px !important;
+      width: calc(100vw - 10px) !important;
+      height: calc(100vh - 10px) !important;
+    }
   }
   
   .camera-controls {

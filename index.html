@@ -816,6 +816,9 @@ function connectWebSocket() {
       room: room
     }));
     
+    // Register for push notifications
+    registerForPushNotifications();
+    
     // Fallback: load from localStorage if server doesn't respond within 3 seconds
     setTimeout(() => {
       const messagesEl = document.getElementById('messages');
@@ -1806,6 +1809,43 @@ Oppure usa il pulsante "Condividi" e "Aggiungi alla schermata Home"`);
       installBtn.remove();
     }
   }, 15000);
+}
+
+// Register for push notifications
+async function registerForPushNotifications() {
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      
+      if (!subscription) {
+        const newSubscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BEl62iUYgUivxIkv69yViEuiBIa40HI8F7jWjEqxuMacWzVzUGqzRf50Rj_hygQxg5EmknBm2VzMM1ne8QkY4A'
+        });
+        
+        // Send subscription to server
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'pushSubscription',
+            subscription: newSubscription
+          }));
+          console.log('📱 Push subscription sent to server');
+        }
+      } else {
+        // Send existing subscription to server
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'pushSubscription',
+            subscription: subscription
+          }));
+          console.log('📱 Existing push subscription sent to server');
+        }
+      }
+    } catch (error) {
+      console.error('Error registering for push notifications:', error);
+    }
+  }
 }
 
 // Initialize login on page load
