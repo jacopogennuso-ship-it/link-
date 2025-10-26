@@ -46,8 +46,65 @@ const wss = new ws.Server({ noServer: true });
 const clients = new Map(); // room -> ws
 const admins = new Set();
 const rooms = new Set(); // Track available rooms
+const chatHistory = new Map(); // room -> messages array
+const CHAT_HISTORY_FILE = './data/chat-history.json';
+
+// Ensure data directory exists
+if (!fs.existsSync('./data')) {
+  fs.mkdirSync('./data', { recursive: true });
+}
+
+// Load chat history from file
+function loadChatHistory() {
+  try {
+    if (fs.existsSync(CHAT_HISTORY_FILE)) {
+      const data = fs.readFileSync(CHAT_HISTORY_FILE, 'utf8');
+      const history = JSON.parse(data);
+      for (const [room, messages] of Object.entries(history)) {
+        chatHistory.set(room, messages);
+      }
+      console.log('Chat history loaded from file');
+    }
+  } catch (err) {
+    console.error('Error loading chat history:', err);
+  }
+}
+
+// Save chat history to file
+function saveChatHistory() {
+  try {
+    const history = Object.fromEntries(chatHistory);
+    fs.writeFileSync(CHAT_HISTORY_FILE, JSON.stringify(history, null, 2));
+    console.log('Chat history saved to file');
+  } catch (err) {
+    console.error('Error saving chat history:', err);
+  }
+}
+
+// Load chat history on startup
+loadChatHistory();
+
+// Save chat history every 30 seconds as backup
+setInterval(() => {
+  if (chatHistory.size > 0) {
+    saveChatHistory();
+  }
+}, 30000);
 
 const server = app.listen(PORT, ()=>console.log(`Server attivo su http://localhost:${PORT}`));
+
+// Save chat history on server shutdown
+process.on('SIGINT', () => {
+  console.log('Saving chat history before shutdown...');
+  saveChatHistory();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Saving chat history before shutdown...');
+  saveChatHistory();
+  process.exit(0);
+});
 
 server.on('upgrade', (req, socket, head)=>{
   wss.handleUpgrade(req, socket, head, ws=>wss.emit('connection', ws, req));
@@ -81,14 +138,27 @@ wss.on('connection', (ws, req)=>{
 
       // Chat with attachments
       if(data.type==='chat'){
+        const message = {
+          from: ws.role==='client' ? room : 'Admin',
+          text: data.text,
+          attachment: data.attachment,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Save message to history
+        if (!chatHistory.has(room)) {
+          chatHistory.set(room, []);
+        }
+        chatHistory.get(room).push(message);
+        
+        // Save to file after adding message
+        saveChatHistory();
+        
         if(ws.role==='client'){
           admins.forEach(a=>{
             if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
               type:'chat', 
-              from:room, 
-              text:data.text, 
-              attachment: data.attachment,
-              timestamp: new Date().toISOString()
+              ...message
             }));
           });
         } else if(ws.role==='admin'){
@@ -98,10 +168,7 @@ wss.on('connection', (ws, req)=>{
             const c=clients.get(targetRoom);
             if(c.readyState===ws.OPEN) c.send(JSON.stringify({ 
               type:'chat', 
-              from:'Admin', 
-              text:data.text,
-              attachment: data.attachment,
-              timestamp: new Date().toISOString()
+              ...message
             }));
           }
         }
@@ -156,6 +223,16 @@ wss.on('connection', (ws, req)=>{
         if(ws.role==='admin'){
           ws.selectedRoom = data.room;
           ws.send(JSON.stringify({ type:'roomSelected', room: data.room }));
+          
+          // Send chat history for the selected room
+          if(chatHistory.has(data.room)){
+            const history = chatHistory.get(data.room);
+            ws.send(JSON.stringify({ 
+              type:'chatHistory', 
+              room: data.room,
+              messages: history 
+            }));
+          }
         }
       }
 

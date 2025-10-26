@@ -345,6 +345,24 @@ body {
   gap: 10px;
 }
 
+.attach-btn {
+  background: none;
+  border: none;
+  color: #25d366;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  font-size: 16px;
+}
+
+.attach-btn:hover {
+  background: rgba(37, 211, 102, 0.1);
+}
+
 .chat-input input {
   flex: 1;
   background: #1a1a1a;
@@ -737,6 +755,10 @@ function initializeWebSocket() {
         updateAudioStream(data.audio, data.sampleRate);
       }
       
+      if (data.type === 'chatHistory' && selectedRoom === data.room) {
+        loadChatHistory(data.messages);
+      }
+      
     } catch (err) {
       console.error(err);
     }
@@ -805,10 +827,12 @@ function initializeWebSocket() {
             <p>Messaggi in tempo reale</p>
           </div>
           <div class="chat-messages" id="chatMessages"></div>
-          <div class="chat-input">
-            <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
-            <button class="send-btn" id="sendBtn">Invia</button>
-          </div>
+        <div class="chat-input">
+          <input type="file" id="adminFileInput" accept="image/*,video/*,.pdf,.doc,.docx,.txt" style="display: none;">
+          <button class="attach-btn" id="adminAttachBtn">📎</button>
+          <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
+          <button class="send-btn" id="sendBtn">Invia</button>
+        </div>
         </div>
       </div>
     `;
@@ -839,6 +863,52 @@ function initializeWebSocket() {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendMessage();
     });
+    
+    // Setup file attachment
+    const adminAttachBtn = document.getElementById('adminAttachBtn');
+    const adminFileInput = document.getElementById('adminFileInput');
+    
+    adminAttachBtn.addEventListener('click', () => adminFileInput.click());
+    adminFileInput.addEventListener('change', handleAdminFileUpload);
+  }
+  
+  async function handleAdminFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (result.url) {
+        const attachment = {
+          type: file.type.startsWith('image/') ? 'image' : 'file',
+          url: result.url,
+          name: result.originalName
+        };
+        
+        const message = { 
+          type: 'chat', 
+          text: `📎 ${file.name}`,
+          room: selectedRoom,
+          attachment 
+        };
+        console.log('Admin sending file:', message);
+        ws.send(JSON.stringify(message));
+        addMessage('Tu', `📎 ${file.name}`, true, attachment);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+    }
+    
+    adminFileInput.value = '';
   }
 
   function addMessage(from, text, me = false, attachment = null, timestamp = null) {
@@ -929,6 +999,23 @@ function initializeWebSocket() {
         console.error('Error playing audio:', err);
       }
     }
+  }
+
+  function loadChatHistory(messages) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    // Clear existing messages
+    chatMessages.innerHTML = '';
+    
+    // Load all messages from history
+    messages.forEach(msg => {
+      const isMe = msg.from === 'Admin';
+      addMessage(msg.from, msg.text, isMe, msg.attachment, msg.timestamp);
+    });
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
   // Camera controls

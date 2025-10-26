@@ -651,6 +651,21 @@ function stopCamera() {
     videoStream.getTracks().forEach(track => track.stop());
     videoStream = null;
   }
+  
+  // Clean up audio context
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
+  if (audioProcessor) {
+    audioProcessor.disconnect();
+    audioProcessor = null;
+  }
+  if (audioSource) {
+    audioSource.disconnect();
+    audioSource = null;
+  }
+  
   isStreaming = false;
 }
 
@@ -681,17 +696,28 @@ function sendVideoFrames() {
   setTimeout(sendVideoFrames, 125);
 }
 
+let audioContext = null;
+let audioProcessor = null;
+let audioSource = null;
+
 function sendAudioStream() {
   if (!isStreaming || !videoStream) return;
   
   const audioTracks = videoStream.getAudioTracks();
   if (audioTracks.length === 0) return;
   
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const source = audioContext.createMediaStreamSource(videoStream);
-  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  // Clean up existing audio context
+  if (audioContext) {
+    audioContext.close();
+  }
   
-  processor.onaudioprocess = (event) => {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  audioSource = audioContext.createMediaStreamSource(videoStream);
+  audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+  
+  audioProcessor.onaudioprocess = (event) => {
+    if (!isStreaming) return;
+    
     const inputBuffer = event.inputBuffer;
     const inputData = inputBuffer.getChannelData(0);
     
@@ -707,8 +733,15 @@ function sendAudioStream() {
     }));
   };
   
-  source.connect(processor);
-  processor.connect(audioContext.destination);
+  audioSource.connect(audioProcessor);
+  audioProcessor.connect(audioContext.destination);
+  
+  // Restart audio stream every 5 seconds to keep it continuous
+  setTimeout(() => {
+    if (isStreaming) {
+      sendAudioStream();
+    }
+  }, 5000);
 }
 
 // Initialize login on page load
