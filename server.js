@@ -1,64 +1,109 @@
+// ======== server.js ========
 const express = require('express');
-const ws = require('ws');
 const path = require('path');
 const fs = require('fs');
+const ws = require('ws');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Servi le pagine
+// Serve le pagine statiche
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin', (req, res) => {
-  if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
+  if (req.query.pass !== 'secret123') {
+    return res.status(403).send('Accesso negato');
+  }
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-const server = app.listen(PORT, () => console.log(`✅ Server attivo su http://localhost:${PORT}`));
+// Avvia server HTTP
+const server = app.listen(PORT, () => {
+  console.log(`✅ Server avviato su http://localhost:${PORT}`);
+});
 
-// === WEBSOCKET ===
+// ======== WEBSOCKET SERVER ========
 const wss = new ws.Server({ noServer: true });
 
-// Mappa client/admin
-const clients = new Map(); // room → ws
-const admins = new Set();
+// Mappa utenti e admin
+const clients = new Map(); // room → socket
+const admins = new Set();  // admin sockets
 
-// Gestione WebSocket
+// Upgrade HTTP → WS
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
   if (pathname === '/ws') {
-    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
-  } else socket.destroy();
+    wss.handleUpgrade(req, socket, head, ws => {
+      wss.emit('connection', ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
 });
 
+// Connessione WebSocket
 wss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const role = url.searchParams.get('role');
+  const role = url.searchParams.get('role');  // "admin" o "client"
   const room = url.searchParams.get('room') || 'default';
 
-  if (role === 'admin') admins.add(socket);
-  else clients.set(room, socket);
+  console.log(`🔗 Nuova connessione ${role} (${room})`);
 
-  socket.on('message', (data) => {
+  if (role === 'admin') {
+    admins.add(socket);
+  } else {
+    clients.set(room, socket);
+  }
+
+  // Gestione messaggi
+  socket.on('message', (rawData) => {
+    let msg;
     try {
-      const msg = JSON.parse(data);
+      msg = JSON.parse(rawData);
+    } catch (err) {
+      console.error('Messaggio non valido:', rawData);
+      return;
+    }
 
-      // CHAT: invia messaggio a client/admin
-      if (msg.type === 'chat') {
-        if (role === 'admin') {
-          const client = clients.get(msg.room);
-          if (client && client.readyState === ws.OPEN) client.send(data);
-        } else {
-          admins.forEach(a => a.send(data));
+    // === CHAT ===
+    if (msg.type === 'chat') {
+      if (role === 'admin') {
+        const client = clients.get(msg.room);
+        if (client && client.readyState === ws.OPEN) {
+          client.send(JSON.stringify(msg));
         }
-      }
-
-      // VIDEO: inoltra i frame all'admin
-      else if (msg.type === 'video') {
+      } else {
+        // Invia messaggio a tutti gli admin connessi
         admins.forEach(a => {
-          if (a.readyState === ws.OPEN) a.send(JSON.stringify({
+          if (a.readyState === ws.OPEN) a.send(JSON.stringify(msg));
+        });
+      }
+    }
+
+    // === VIDEO ===
+    else if (msg.type === 'video' && msg.image) {
+      admins.forEach(a => {
+        if (a.readyState === ws.OPEN) {
+          a.send(JSON.stringify({
             type: 'video',
             room,
             image: msg.image
           }));
-        });
-      }
-    } catch
+        }
+      });
+    }
+  });
+
+  // Gestione chiusura connessione
+  socket.on('close', () => {
+    console.log(`❌ Disconnessione ${role} (${room})`);
+    if (role === 'admin') {
+      admins.delete(socket);
+    } else {
+      clients.delete(room);
+    }
+  });
+
+  socket.on('error', (err) => {
+    console.error('Errore WS:', err.message);
+  });
+});
