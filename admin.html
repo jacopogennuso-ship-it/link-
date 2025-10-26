@@ -1205,6 +1205,34 @@ body {
   }
 }
 
+/* Admin Camera Controls */
+.camera-controls-local {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.camera-controls-local .camera-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.camera-controls-local .camera-btn:hover {
+  background: #0056b3;
+  transform: translateY(-2px);
+}
+
+.camera-controls-local .camera-btn:active {
+  transform: translateY(0);
+}
+
 /* Admin Login Styles */
 .admin-login-container {
   display: flex;
@@ -1421,6 +1449,8 @@ let currentCamera = 'back';
 let videoStreams = {};
 let ws = null;
 let adminHeartbeatInterval = null;
+let adminVideoStream = null;
+let adminVideoElement = null;
 
 // Audio variables - moved to top to avoid initialization errors
 let adminAudioContext = null;
@@ -2050,17 +2080,17 @@ function initializeWebSocket() {
       <div class="room-layout">
         <div class="video-section">
           <div class="video-container">
-            <h3>Stream Live</h3>
+            <h3>Admin Camera</h3>
             <div class="video-wrapper">
-              <img id="video-back" src="" alt="Camera posteriore">
+              <video id="admin-video" autoplay muted playsinline style="width: 100%; height: 200px; background: #000;"></video>
               <div class="video-overlay">
                 <div class="camera-indicator" id="cameraIndicator">Posteriore</div>
                 <div class="video-status" id="status-back">Offline</div>
               </div>
             </div>
-            <div class="audio-indicator" id="audioIndicator">
-              <span class="audio-icon">🔊</span>
-              <span class="audio-text">Audio Live</span>
+            <div class="camera-controls-local">
+              <button id="startCameraBtn" class="camera-btn">Avvia Camera</button>
+              <button id="stopCameraBtn" class="camera-btn" style="display: none;">Ferma Camera</button>
             </div>
           </div>
         </div>
@@ -2083,6 +2113,9 @@ function initializeWebSocket() {
     
     // Setup chat functionality
     setupChat();
+    
+    // Setup admin camera
+    setupAdminCamera();
     
     // Notify server about room selection
     ws.send(JSON.stringify({ type: 'selectRoom', room }));
@@ -2121,6 +2154,70 @@ function initializeWebSocket() {
       adminFileInput.addEventListener('change', handleAdminFileUpload);
     } else {
       console.error('❌ Admin file attachment elements not found:', { adminAttachBtn, adminFileInput });
+    }
+  }
+
+  function setupAdminCamera() {
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const stopCameraBtn = document.getElementById('stopCameraBtn');
+    const cameraIndicator = document.getElementById('cameraIndicator');
+    const statusElement = document.getElementById('status-back');
+    
+    if (startCameraBtn) {
+      startCameraBtn.addEventListener('click', async () => {
+        try {
+          console.log('🎥 Starting admin camera...');
+          const constraints = {
+            video: {
+              facingMode: currentCamera === 'front' ? 'user' : 'environment',
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          };
+          
+          adminVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+          adminVideoElement = document.getElementById('admin-video');
+          
+          if (adminVideoElement) {
+            adminVideoElement.srcObject = adminVideoStream;
+            adminVideoElement.play();
+            
+            startCameraBtn.style.display = 'none';
+            stopCameraBtn.style.display = 'inline-block';
+            cameraIndicator.textContent = currentCamera === 'front' ? 'Frontale' : 'Posteriore';
+            statusElement.textContent = 'Online';
+            statusElement.style.color = '#28a745';
+            
+            console.log('✅ Admin camera started successfully');
+          }
+        } catch (error) {
+          console.error('❌ Error starting admin camera:', error);
+          statusElement.textContent = 'Errore';
+          statusElement.style.color = '#dc3545';
+        }
+      });
+    }
+    
+    if (stopCameraBtn) {
+      stopCameraBtn.addEventListener('click', () => {
+        console.log('🎥 Stopping admin camera...');
+        
+        if (adminVideoStream) {
+          adminVideoStream.getTracks().forEach(track => track.stop());
+          adminVideoStream = null;
+        }
+        
+        if (adminVideoElement) {
+          adminVideoElement.srcObject = null;
+        }
+        
+        startCameraBtn.style.display = 'inline-block';
+        stopCameraBtn.style.display = 'none';
+        statusElement.textContent = 'Offline';
+        statusElement.style.color = '#6c757d';
+        
+        console.log('✅ Admin camera stopped');
+      });
     }
   }
   
@@ -2342,53 +2439,83 @@ function initializeWebSocket() {
   }
 
   // Camera controls
-  frontCameraBtn.addEventListener('click', () => {
+  frontCameraBtn.addEventListener('click', async () => {
     if (selectedRoom) {
       currentCamera = 'front';
       frontCameraBtn.classList.add('active');
       backCameraBtn.classList.remove('active');
-      const message = { 
-        type: 'cameraControl', 
-        targetRoom: selectedRoom, 
-        camera: 'front' 
-      };
-      console.log('🎥 Admin sending camera control:', message);
-      console.log('🎥 WebSocket state:', ws.readyState);
-      console.log('🎥 Selected room:', selectedRoom);
       
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
-        console.log('✅ Camera control message sent');
-      } else {
-        console.log('❌ WebSocket not open, cannot send camera control');
+      console.log('🎥 Switching to front camera');
+      
+      // If camera is already running, restart with new camera
+      if (adminVideoStream) {
+        adminVideoStream.getTracks().forEach(track => track.stop());
+        
+        try {
+          const constraints = {
+            video: {
+              facingMode: 'user',
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          };
+          
+          adminVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (adminVideoElement) {
+            adminVideoElement.srcObject = adminVideoStream;
+            adminVideoElement.play();
+          }
+          
+          const cameraIndicator = document.getElementById('cameraIndicator');
+          if (cameraIndicator) {
+            cameraIndicator.textContent = 'Frontale';
+          }
+          
+          console.log('✅ Switched to front camera');
+        } catch (error) {
+          console.error('❌ Error switching to front camera:', error);
+        }
       }
-    } else {
-      console.log('❌ No room selected for camera control');
     }
   });
 
-  backCameraBtn.addEventListener('click', () => {
+  backCameraBtn.addEventListener('click', async () => {
     if (selectedRoom) {
       currentCamera = 'back';
       backCameraBtn.classList.add('active');
       frontCameraBtn.classList.remove('active');
-      const message = { 
-        type: 'cameraControl', 
-        targetRoom: selectedRoom, 
-        camera: 'back' 
-      };
-      console.log('🎥 Admin sending camera control:', message);
-      console.log('🎥 WebSocket state:', ws.readyState);
-      console.log('🎥 Selected room:', selectedRoom);
       
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
-        console.log('✅ Camera control message sent');
-      } else {
-        console.log('❌ WebSocket not open, cannot send camera control');
+      console.log('🎥 Switching to back camera');
+      
+      // If camera is already running, restart with new camera
+      if (adminVideoStream) {
+        adminVideoStream.getTracks().forEach(track => track.stop());
+        
+        try {
+          const constraints = {
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          };
+          
+          adminVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (adminVideoElement) {
+            adminVideoElement.srcObject = adminVideoStream;
+            adminVideoElement.play();
+          }
+          
+          const cameraIndicator = document.getElementById('cameraIndicator');
+          if (cameraIndicator) {
+            cameraIndicator.textContent = 'Posteriore';
+          }
+          
+          console.log('✅ Switched to back camera');
+        } catch (error) {
+          console.error('❌ Error switching to back camera:', error);
+        }
       }
-    } else {
-      console.log('❌ No room selected for camera control');
     }
   });
 

@@ -3,7 +3,6 @@ const ws = require('ws');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
-const webpush = require('web-push');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -25,7 +24,7 @@ const upload = multer({ storage: storage });
 app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static('uploads'));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/admin', (req, res) => {
   if(req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
@@ -43,36 +42,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
   });
 });
 
-// Push subscription endpoint
-app.post('/subscribe-push', (req, res) => {
-  try {
-    const { subscription, room } = req.body;
-    
-    if (!subscription || !room) {
-      return res.status(400).json({ error: 'Missing subscription or room' });
-    }
-    
-    // Load existing subscriptions
-    const subscriptions = loadPushSubscriptions();
-    
-    // Add new subscription
-    subscriptions.set(room, subscription);
-    
-    // Save to file
-    savePushSubscriptions(subscriptions);
-    
-    console.log(`📱 Push subscription saved for room: ${room}`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Push subscription error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// VAPID public key endpoint
-app.get('/vapid-public-key', (req, res) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
 
 const wss = new ws.Server({ noServer: true });
 const clients = new Map(); // room -> ws
@@ -82,18 +51,6 @@ const chatHistory = new Map(); // room -> messages array
 const roomData = new Map(); // room -> { id, name, createdAt, lastActivity }
 const CHAT_HISTORY_FILE = './data/chat-history.json';
 const ROOMS_DATA_FILE = './data/rooms-data.json';
-const PUSH_SUBSCRIPTIONS_FILE = './data/push-subscriptions.json';
-
-// VAPID Keys (genera su https://vapidkeys.com/)
-const VAPID_PUBLIC_KEY = 'BB8FYQIMEa7-25gltUu85BZY5plHQt962LWvr4EztI2oChOCzDA5rmdRl8HF3s7psoyynwRche6Fwue3AYuvfhU';
-const VAPID_PRIVATE_KEY = 'IUuMBnSYPtSdKf1l-VrKHhxF2yfzw1IUGsQR5fh1P0c';
-
-// Configure VAPID
-webpush.setVapidDetails(
-  'mailto:jacopo.gennuso@gmail.com',
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
 
 // Ensure data directory exists
 if (!fs.existsSync('./data')) {
@@ -183,88 +140,6 @@ function saveRoomsData() {
   }
 }
 
-// Load push subscriptions from file
-function loadPushSubscriptions() {
-  try {
-    if (fs.existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(PUSH_SUBSCRIPTIONS_FILE, 'utf8'));
-      return new Map(Object.entries(data));
-    }
-  } catch (error) {
-    console.error('Error loading push subscriptions:', error);
-  }
-  return new Map();
-}
-
-// Save push subscriptions to file
-function savePushSubscriptions(subscriptions) {
-  try {
-    const data = Object.fromEntries(subscriptions);
-    fs.writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
-    console.log('Push subscriptions saved to file');
-  } catch (error) {
-    console.error('Error saving push subscriptions:', error);
-  }
-}
-
-// Send push notification
-async function sendPushNotification(room, title, message) {
-  try {
-    const subscriptions = loadPushSubscriptions();
-    const subscription = subscriptions.get(room);
-    
-    if (!subscription) {
-      console.log(`❌ No push subscription found for room: ${room}`);
-      return;
-    }
-    
-    const payload = JSON.stringify({
-      title: title,
-      body: message,
-      icon: '/icons/icon-192x192.svg',
-      badge: '/icons/icon-72x72.svg',
-      tag: 'jacopo-chat',
-      requireInteraction: true,
-      data: {
-        room: room,
-        timestamp: Date.now()
-      }
-    });
-    
-    await webpush.sendNotification(subscription, payload);
-    console.log(`📤 Push notification sent to room ${room}: ${message}`);
-  } catch (error) {
-    console.error('Push notification error:', error);
-  }
-}
-
-// Send push notification to specific subscription
-async function sendPushNotificationToSubscription(subscription, title, message, room = null) {
-  try {
-    if (!subscription) {
-      console.log(`❌ No push subscription provided`);
-      return;
-    }
-    
-    const payload = JSON.stringify({
-      title: title,
-      body: message,
-      icon: '/icons/icon-192x192.svg',
-      badge: '/icons/icon-72x72.svg',
-      tag: 'jacopo-chat',
-      requireInteraction: true,
-      data: {
-        room: room,
-        timestamp: Date.now()
-      }
-    });
-    
-    await webpush.sendNotification(subscription, payload);
-    console.log(`📤 Push notification sent: ${message}`);
-  } catch (error) {
-    console.error('Error sending push notification:', error);
-  }
-}
 
 // Load data on startup
 loadChatHistory();
@@ -413,33 +288,9 @@ wss.on('connection', (ws, req)=>{
                 ...message
               }));
               
-              // Send push notification to admin
-              a.send(JSON.stringify({
-                type: 'pushNotification',
-                title: `Nuovo messaggio da ${room}`,
-                body: message.text,
-                icon: '/icons/icon-192x192.svg',
-                badge: '/icons/icon-72x72.svg'
-              }));
-              
-              // Also send a visual notification for in-app display
-              a.send(JSON.stringify({
-                type: 'visualNotification',
-                title: `Nuovo messaggio da ${room}`,
-                body: message.text,
-                timestamp: Date.now()
-              }));
             }
           });
           
-          // Send real push notification (external) to all admins
-          for (const admin of admins) {
-            if (admin.pushSubscription) {
-              sendPushNotificationToSubscription(admin.pushSubscription, `Nuovo messaggio da ${targetRoom}`, message.text, targetRoom)
-                .then(() => console.log(`📤 Push notification sent to admin: ${message.text}`))
-                .catch(err => console.error('Error sending push notification to admin:', err));
-            }
-          }
         } else if(ws.role==='admin'){
           // Admin can send to specific room or broadcast to all
           console.log(`📤 Admin sending message to room: ${targetRoom}`);
@@ -454,33 +305,6 @@ wss.on('connection', (ws, req)=>{
                 ...message
               }));
               
-              // Send push notification to client
-              c.send(JSON.stringify({
-                type: 'pushNotification',
-                title: 'Nuovo messaggio da Admin',
-                body: message.text,
-                icon: '/icons/icon-192x192.svg',
-                badge: '/icons/icon-72x72.svg'
-              }));
-              
-              // Also send a visual notification for in-app display
-              c.send(JSON.stringify({
-                type: 'visualNotification',
-                title: 'Nuovo messaggio da Admin',
-                body: message.text,
-                timestamp: Date.now()
-              }));
-              
-              // Send real push notification (external) to client
-              if (c.pushSubscription) {
-                sendPushNotificationToSubscription(c.pushSubscription, 'Nuovo messaggio da Admin', message.text, targetRoom)
-                  .then(() => console.log(`📤 Push notification sent to client: ${message.text}`))
-                  .catch(err => console.error('Error sending push notification to client:', err));
-              } else {
-                // Fallback to room-based notification
-                sendPushNotification(targetRoom, 'Nuovo messaggio da Admin', message.text);
-                console.log(`📤 Push notification sent to room ${targetRoom}: ${message.text}`);
-              }
             }
           }
           
@@ -516,18 +340,6 @@ wss.on('connection', (ws, req)=>{
         }
       }
 
-      // Handle push subscription registration
-      if(data.type==='pushSubscription'){
-        if(ws.role==='client'){
-          // Store client push subscription
-          ws.pushSubscription = data.subscription;
-          console.log(`📱 Client push subscription registered for room ${room}`);
-        } else if(ws.role==='admin'){
-          // Store admin push subscription
-          ws.pushSubscription = data.subscription;
-          console.log(`👨‍💼 Admin push subscription registered`);
-        }
-      }
 
       // Video with improved streaming
       if(data.type==='video'){
