@@ -1030,8 +1030,14 @@ function initializeWebSocket() {
         updateRoomsList(getCurrentRooms().filter(room => room !== data.room));
       }
       
-      if (data.type === 'chat' && selectedRoom === data.from) {
-        addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+      if (data.type === 'chat') {
+        console.log('📨 Admin received chat message:', data);
+        // Only show messages for the selected room
+        if (selectedRoom === data.from) {
+          addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+        } else {
+          console.log(`📨 Message from ${data.from} but selected room is ${selectedRoom}`);
+        }
       }
       
       if (data.type === 'video' && selectedRoom === data.room) {
@@ -1042,8 +1048,14 @@ function initializeWebSocket() {
         updateAudioStream(data.audio, data.sampleRate);
       }
       
-      if (data.type === 'chatHistory' && selectedRoom === data.room) {
-        loadChatHistory(data.messages);
+      if (data.type === 'chatHistory') {
+        console.log('📚 Admin received chat history:', data);
+        if (selectedRoom === data.room) {
+          console.log(`📚 Loading chat history for room ${data.room}: ${data.messages.length} messages`);
+          loadChatHistory(data.messages);
+        } else {
+          console.log(`📚 Chat history for room ${data.room} but selected room is ${selectedRoom}`);
+        }
       }
       
       if (data.type === 'pong') {
@@ -1207,7 +1219,12 @@ function initializeWebSocket() {
 
   function addMessage(from, text, me = false, attachment = null, timestamp = null) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
+    if (!chatMessages) {
+      console.log('❌ Chat messages element not found in addMessage');
+      return;
+    }
+    
+    console.log(`💬 Adding message: ${from} - ${text} (me: ${me})`);
     
     const messageEl = document.createElement('div');
     messageEl.className = `message ${me ? 'sent' : 'received'}`;
@@ -1244,6 +1261,8 @@ function initializeWebSocket() {
     messageEl.appendChild(bubbleEl);
     chatMessages.appendChild(messageEl);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    console.log(`✅ Message added to chat: ${from} - ${text}`);
   }
 
   function updateVideoStream(camera, imageData) {
@@ -1335,19 +1354,26 @@ function initializeWebSocket() {
 
   function loadChatHistory(messages) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
+    if (!chatMessages) {
+      console.log('❌ Chat messages element not found');
+      return;
+    }
+    
+    console.log(`📚 Loading chat history: ${messages.length} messages`);
     
     // Clear existing messages
     chatMessages.innerHTML = '';
     
     // Load all messages from history
-    messages.forEach(msg => {
+    messages.forEach((msg, index) => {
       const isMe = msg.from === 'Admin';
+      console.log(`📚 Loading message ${index + 1}: ${msg.from} - ${msg.text}`);
       addMessage(msg.from, msg.text, isMe, msg.attachment, msg.timestamp);
     });
     
     // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    console.log(`📚 Chat history loaded: ${messages.length} messages`);
   }
 
   // Camera controls

@@ -237,7 +237,10 @@ wss.on('connection', (ws, req)=>{
       // Camera control from admin
       if(data.type==='cameraControl'){
         if(ws.role==='admin'){
-          const targetRoom = data.targetRoom || ws.selectedRoom;
+          const targetRoom = data.targetRoom || data.room;
+          console.log(`🎥 Camera control request for room: ${targetRoom}`);
+          console.log(`📊 Available clients: ${Array.from(clients.keys())}`);
+          
           if(targetRoom && clients.has(targetRoom)){
             const client = clients.get(targetRoom);
             if(client.readyState===ws.OPEN) {
@@ -246,8 +249,12 @@ wss.on('connection', (ws, req)=>{
                 camera: data.camera,
                 quality: data.quality || 'medium'
               }));
-              console.log(`Camera control sent to room ${targetRoom}: ${data.camera}`);
+              console.log(`✅ Camera control sent to room ${targetRoom}: ${data.camera}`);
+            } else {
+              console.log(`❌ Client in room ${targetRoom} is not open`);
             }
+          } else {
+            console.log(`❌ Room ${targetRoom} not found in clients`);
           }
         }
       }
@@ -257,15 +264,19 @@ wss.on('connection', (ws, req)=>{
         if(ws.role==='admin'){
           ws.selectedRoom = data.room;
           ws.send(JSON.stringify({ type:'roomSelected', room: data.room }));
+          console.log(`📋 Admin selected room: ${data.room}`);
           
           // Send chat history for the selected room
           if(chatHistory.has(data.room)){
             const history = chatHistory.get(data.room);
+            console.log(`📚 Sending chat history for room ${data.room}: ${history.length} messages`);
             ws.send(JSON.stringify({ 
               type:'chatHistory', 
               room: data.room,
               messages: history 
             }));
+          } else {
+            console.log(`📚 No chat history found for room ${data.room}`);
           }
         }
       }
