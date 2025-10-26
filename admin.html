@@ -1787,10 +1787,7 @@ function initializeWebSocket() {
         }));
       }
       
-      // Add to chat
-      addMessage('Admin', message);
-      
-      // Clear input
+      // Clear input (message will be added when server echoes it back)
       input.value = '';
     }
   }
@@ -1811,10 +1808,7 @@ function initializeWebSocket() {
         }));
       }
       
-      // Add to chat
-      addFullscreenMessage('Admin', message, true);
-      
-      // Clear input
+      // Clear input (message will be added when server echoes it back)
       input.value = '';
     }
   }

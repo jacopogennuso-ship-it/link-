@@ -372,26 +372,39 @@ wss.on('connection', (ws, req)=>{
 
       // Chat with attachments
       if(data.type==='chat'){
+        // Determine the target room
+        const targetRoom = ws.role==='client' ? room : (data.room || ws.selectedRoom);
+        console.log(`🔍 Message room determination:`, {
+          role: ws.role,
+          room: room,
+          dataRoom: data.room,
+          selectedRoom: ws.selectedRoom,
+          targetRoom: targetRoom
+        });
+        
         const message = {
           from: ws.role==='client' ? room : 'Admin',
           text: data.text,
           attachment: data.attachment,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          room: targetRoom
         };
         
         // Save message to history
-        if (!chatHistory.has(room)) {
-          chatHistory.set(room, []);
+        if (!chatHistory.has(targetRoom)) {
+          chatHistory.set(targetRoom, []);
         }
-        chatHistory.get(room).push(message);
+        chatHistory.get(targetRoom).push(message);
         
-        console.log(`Message saved for room ${room}:`, message);
-        console.log(`Total messages in room ${room}:`, chatHistory.get(room).length);
+        console.log(`Message saved for room ${targetRoom}:`, message);
+        console.log(`Total messages in room ${targetRoom}:`, chatHistory.get(targetRoom).length);
         
         // Save to file after adding message
         saveChatHistory();
         
         if(ws.role==='client'){
+          console.log(`📤 Client sending message from room: ${room}`);
+          console.log(`📊 Available admins:`, admins.length);
           // Send client message to all admins
           admins.forEach(a=>{
             if(a.readyState===ws.OPEN) {
@@ -422,14 +435,17 @@ wss.on('connection', (ws, req)=>{
           // Send real push notification (external) to all admins
           for (const admin of admins) {
             if (admin.pushSubscription) {
-              sendPushNotificationToSubscription(admin.pushSubscription, `Nuovo messaggio da ${room}`, message.text, room)
+              sendPushNotificationToSubscription(admin.pushSubscription, `Nuovo messaggio da ${targetRoom}`, message.text, targetRoom)
                 .then(() => console.log(`📤 Push notification sent to admin: ${message.text}`))
                 .catch(err => console.error('Error sending push notification to admin:', err));
             }
           }
         } else if(ws.role==='admin'){
           // Admin can send to specific room or broadcast to all
-          const targetRoom = data.room || ws.selectedRoom;
+          console.log(`📤 Admin sending message to room: ${targetRoom}`);
+          console.log(`📊 Available clients:`, Array.from(clients.keys()));
+          console.log(`📊 Client exists for room ${targetRoom}:`, clients.has(targetRoom));
+          
           if(targetRoom && clients.has(targetRoom)){
             const c=clients.get(targetRoom);
             if(c.readyState===ws.OPEN) {
