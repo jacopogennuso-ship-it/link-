@@ -109,6 +109,9 @@ coverage
 # Uploads directory (for file uploads)
 uploads/
 
+# Data directory (chat history, etc.)
+data/
+
 # OS generated files
 .DS_Store
 .DS_Store?
