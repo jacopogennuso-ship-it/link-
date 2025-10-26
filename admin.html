@@ -2026,6 +2026,16 @@ function initializeWebSocket() {
     if (rooms.length === 0) {
       console.log('📭 No rooms available');
       roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
+      
+      // Clear selected room if no rooms are available
+      selectedRoom = null;
+      selectedRoomTitle.textContent = 'Seleziona una stanza';
+      cameraControls.style.display = 'none';
+      mainContent.innerHTML = `
+        <div class="no-room-selected">
+          Seleziona una stanza per iniziare
+        </div>
+      `;
       return;
     }
     
@@ -2058,6 +2068,21 @@ function initializeWebSocket() {
   }
 
   function selectRoom(room) {
+    // Check if room exists in the current rooms list
+    const availableRooms = Array.from(document.querySelectorAll('.room-item')).map(item => item.dataset.room);
+    if (!availableRooms.includes(room)) {
+      console.log(`❌ Room ${room} not found in available rooms:`, availableRooms);
+      selectedRoom = null;
+      selectedRoomTitle.textContent = 'Seleziona una stanza';
+      cameraControls.style.display = 'none';
+      mainContent.innerHTML = `
+        <div class="no-room-selected">
+          Stanza non disponibile. Seleziona una stanza valida.
+        </div>
+      `;
+      return;
+    }
+    
     selectedRoom = room;
     
     // Save selected room to localStorage
@@ -2067,7 +2092,11 @@ function initializeWebSocket() {
     document.querySelectorAll('.room-item').forEach(item => {
       item.classList.remove('active');
     });
-    document.querySelector(`[data-room="${room}"]`).classList.add('active');
+    
+    const roomElement = document.querySelector(`[data-room="${room}"]`);
+    if (roomElement) {
+      roomElement.classList.add('active');
+    }
     
     // Create chat button
     updateChatButton();
