@@ -381,6 +381,7 @@ body {
 <!-- Chat Interface -->
 <div class="chat-container" id="chatContainer" style="display: none;">
   <div class="status-bar" id="statusBar">Connessione...</div>
+  <button id="reconnectBtn" style="display: none; position: fixed; top: 10px; right: 10px; background: #25d366; color: white; border: none; padding: 8px 12px; border-radius: 15px; cursor: pointer; z-index: 1000;">🔄 Riconnetti</button>
   
   <div class="header">
     <div class="avatar">A</div>
@@ -423,6 +424,10 @@ let videoStream = null;
 let videoElement = null;
 let canvas = null;
 let isStreaming = false;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 10;
+let reconnectInterval = 3000; // 3 seconds
+let isReconnecting = false;
 
 // Login elements
 const loginContainer = document.getElementById('loginContainer');
@@ -462,8 +467,7 @@ function handleLogin() {
 }
 
 function initializeChat() {
-  // Initialize WebSocket connection
-  ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
+  connectWebSocket();
   
   // Get chat elements
   messagesEl = document.getElementById('messages');
@@ -477,24 +481,97 @@ function initializeChat() {
   
   // Setup chat functionality
   setupChatFunctionality();
+  
+  // Setup reconnect button
+  const reconnectBtn = document.getElementById('reconnectBtn');
+  if (reconnectBtn) {
+    reconnectBtn.addEventListener('click', () => {
+      console.log('🔄 Manual reconnect requested');
+      reconnectAttempts = 0;
+      isReconnecting = false;
+      connectWebSocket();
+      reconnectBtn.style.display = 'none';
+    });
+  }
+}
+
+function connectWebSocket() {
+  if (isReconnecting) return;
+  
+  console.log(`Connecting to WebSocket... (attempt ${reconnectAttempts + 1})`);
+  ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
+  
+  ws.addEventListener('open', () => {
+    console.log('✅ WebSocket connected');
+    reconnectAttempts = 0;
+    isReconnecting = false;
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Connesso';
+      connectionStatus.style.color = '#25d366';
+    }
+    if (statusBar) {
+      statusBar.textContent = 'Connesso';
+      statusBar.style.color = '#25d366';
+    }
+    
+    // Restart camera if it was streaming
+    if (isStreaming) {
+      console.log('🔄 Restarting camera after reconnection');
+      startCamera();
+    }
+  });
+  
+  ws.addEventListener('close', (event) => {
+    console.log('❌ WebSocket disconnected:', event.code, event.reason);
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Disconnesso';
+      connectionStatus.style.color = '#ff4444';
+    }
+    if (statusBar) {
+      statusBar.textContent = 'Disconnesso';
+      statusBar.style.color = '#ff4444';
+    }
+    
+    // Attempt to reconnect
+    if (reconnectAttempts < maxReconnectAttempts) {
+      reconnectAttempts++;
+      isReconnecting = true;
+      console.log(`🔄 Attempting to reconnect in ${reconnectInterval/1000} seconds... (${reconnectAttempts}/${maxReconnectAttempts})`);
+      
+      if (statusBar) {
+        statusBar.textContent = `Riconnessione in ${reconnectInterval/1000}s... (${reconnectAttempts}/${maxReconnectAttempts})`;
+        statusBar.style.color = '#ffa500';
+      }
+      
+      setTimeout(() => {
+        connectWebSocket();
+      }, reconnectInterval);
+    } else {
+      console.log('❌ Max reconnection attempts reached');
+      if (statusBar) {
+        statusBar.textContent = 'Connessione fallita - Clicca Riconnetti';
+        statusBar.style.color = '#ff4444';
+      }
+      
+      // Show manual reconnect button
+      const reconnectBtn = document.getElementById('reconnectBtn');
+      if (reconnectBtn) {
+        reconnectBtn.style.display = 'block';
+      }
+    }
+  });
+  
+  ws.addEventListener('error', (error) => {
+    console.error('WebSocket error:', error);
+    if (statusBar) {
+      statusBar.textContent = 'Errore di connessione';
+      statusBar.style.color = '#ff4444';
+    }
+  });
 }
 
 function setupChatFunctionality() {
-  // Connection status
-  ws.addEventListener('open', () => {
-    statusBar.textContent = 'Connesso';
-    connectionStatus.textContent = 'Connesso';
-  });
-
-  ws.addEventListener('close', () => {
-    statusBar.textContent = 'Disconnesso';
-    connectionStatus.textContent = 'Disconnesso';
-  });
-
-  ws.addEventListener('error', () => {
-    statusBar.textContent = 'Errore di connessione';
-    connectionStatus.textContent = 'Errore';
-  });
+  // Connection status is now handled in connectWebSocket()
 
   // WebSocket message handling
   ws.addEventListener('message', e => {
