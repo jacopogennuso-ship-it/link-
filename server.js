@@ -1,83 +1,64 @@
 const express = require('express');
 const ws = require('ws');
 const path = require('path');
-
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve client
+// Servi le pagine
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-// Admin protetto
 app.get('/admin', (req, res) => {
   if (req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// WebSocket servers
-const bgWss = new ws.Server({ noServer: true });     // camere
-const adminWss = new ws.Server({ noServer: true });  // dashboard
+const server = app.listen(PORT, () => console.log(`✅ Server attivo su http://localhost:${PORT}`));
 
+// === WEBSOCKET ===
+const wss = new ws.Server({ noServer: true });
+
+// Mappa client/admin
 const clients = new Map(); // room → ws
+const admins = new Set();
 
-// Client camere
-bgWss.on('connection', (socket, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const room = url.searchParams.get('room') || 'unknown';
-  console.log(`📷 Camera connessa: ${room}`);
-  clients.set(room, socket);
-
-  socket.on('message', (data) => {
-    if (typeof data === 'string') {
-      try {
-        const msg = JSON.parse(data);
-        // Comando da admin per cambiare fotocamera
-        if (msg.type === 'switchCamera') {
-          // Invia comando al client
-          if (clients.has(room)) clients.get(room).send(JSON.stringify({ type: 'switchCamera', camera: msg.camera }));
-          return;
-        }
-        if (data === 'ping') return;
-      } catch (err) {
-        // non JSON, probabilmente frame
-      }
-    }
-
-    const metadata = JSON.stringify({ room, timestamp: Date.now() });
-
-    // Invia a tutti gli admin
-    for (const admin of adminWss.clients) {
-      if (admin.readyState === ws.OPEN) {
-        try {
-          admin.send(metadata);
-          if (data instanceof Buffer) admin.send(data, { binary: true });
-        } catch (err) { console.error('Errore invio frame:', err); }
-      }
-    }
-  });
-
-  socket.on('close', () => {
-    clients.delete(room);
-    console.log(`❌ Camera disconnessa: ${room}`);
-    for (const admin of adminWss.clients) {
-      if (admin.readyState === ws.OPEN) admin.send(JSON.stringify({ room, offline: true }));
-    }
-  });
-});
-
-// Admin dashboard
-adminWss.on('connection', (socket) => {
-  console.log('🖥️ Admin collegato');
-  socket.send(JSON.stringify({ type: 'welcome' }));
-});
-
-// Avvio server
-const server = app.listen(PORT, () => console.log(`🚀 Server attivo su http://localhost:${PORT}`));
-
-// Gestione upgrade WebSocket
+// Gestione WebSocket
 server.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
-  if (pathname === '/bg-stream') bgWss.handleUpgrade(req, socket, head, ws => bgWss.emit('connection', ws, req));
-  else if (pathname === '/bg-admin') adminWss.handleUpgrade(req, socket, head, ws => adminWss.emit('connection', ws, req));
-  else socket.destroy();
+  if (pathname === '/ws') {
+    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+  } else socket.destroy();
 });
+
+wss.on('connection', (socket, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const role = url.searchParams.get('role');
+  const room = url.searchParams.get('room') || 'default';
+
+  if (role === 'admin') admins.add(socket);
+  else clients.set(room, socket);
+
+  socket.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+
+      // CHAT: invia messaggio a client/admin
+      if (msg.type === 'chat') {
+        if (role === 'admin') {
+          const client = clients.get(msg.room);
+          if (client && client.readyState === ws.OPEN) client.send(data);
+        } else {
+          admins.forEach(a => a.send(data));
+        }
+      }
+
+      // VIDEO: inoltra i frame all'admin
+      else if (msg.type === 'video') {
+        admins.forEach(a => {
+          if (a.readyState === ws.OPEN) a.send(JSON.stringify({
+            type: 'video',
+            room,
+            image: msg.image
+          }));
+        });
+      }
+    } catch
