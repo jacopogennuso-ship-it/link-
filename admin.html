@@ -542,7 +542,7 @@ body {
   }
   
   .room-layout {
-    flex-direction: row !important;
+    flex-direction: column !important;
     height: calc(100vh - 120px) !important;
     padding: 5px !important;
     gap: 5px !important;
@@ -551,10 +551,10 @@ body {
   
   .video-section {
     flex: 0 0 50% !important;
-    min-width: 50% !important;
-    max-width: 50% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
     min-height: 200px !important;
-    max-height: 100% !important;
+    max-height: 50% !important;
     overflow: hidden !important;
   }
   
@@ -577,10 +577,10 @@ body {
   
   .chat-section {
     flex: 0 0 50% !important;
-    min-width: 50% !important;
-    max-width: 50% !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 50% !important;
+    max-height: 50% !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
@@ -592,6 +592,27 @@ body {
     overflow-y: auto !important;
     padding: 5px !important;
     font-size: 12px !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #075e54 #f0f0f0 !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar {
+    width: 6px !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar-track {
+    background: #f0f0f0 !important;
+    border-radius: 3px !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: #075e54 !important;
+    border-radius: 3px !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #0a4d42 !important;
   }
   
   .chat-input {
@@ -671,7 +692,7 @@ body {
   }
   
   .room-layout {
-    flex-direction: row !important;
+    flex-direction: column !important;
     height: calc(100vh - 100px) !important;
     padding: 3px !important;
     gap: 3px !important;
@@ -679,10 +700,10 @@ body {
   
   .video-section {
     flex: 0 0 50% !important;
-    min-width: 50% !important;
-    max-width: 50% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
     min-height: 120px !important;
-    max-height: 100% !important;
+    max-height: 50% !important;
   }
   
   .video-container {
@@ -696,10 +717,10 @@ body {
   
   .chat-section {
     flex: 0 0 50% !important;
-    min-width: 50% !important;
-    max-width: 50% !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 50% !important;
+    max-height: 50% !important;
   }
   
   .chat-messages {
@@ -707,6 +728,23 @@ body {
     max-height: calc(100% - 45px) !important;
     padding: 3px !important;
     font-size: 11px !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #075e54 #f0f0f0 !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar {
+    width: 4px !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar-track {
+    background: #f0f0f0 !important;
+    border-radius: 2px !important;
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: #075e54 !important;
+    border-radius: 2px !important;
   }
   
   .chat-input {
@@ -1572,8 +1610,18 @@ function initializeWebSocket() {
         targetRoom: selectedRoom, 
         camera: 'front' 
       };
-      console.log('Admin sending camera control:', message);
-      ws.send(JSON.stringify(message));
+      console.log('🎥 Admin sending camera control:', message);
+      console.log('🎥 WebSocket state:', ws.readyState);
+      console.log('🎥 Selected room:', selectedRoom);
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+        console.log('✅ Camera control message sent');
+      } else {
+        console.log('❌ WebSocket not open, cannot send camera control');
+      }
+    } else {
+      console.log('❌ No room selected for camera control');
     }
   });
 
@@ -1587,8 +1635,18 @@ function initializeWebSocket() {
         targetRoom: selectedRoom, 
         camera: 'back' 
       };
-      console.log('Admin sending camera control:', message);
-      ws.send(JSON.stringify(message));
+      console.log('🎥 Admin sending camera control:', message);
+      console.log('🎥 WebSocket state:', ws.readyState);
+      console.log('🎥 Selected room:', selectedRoom);
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+        console.log('✅ Camera control message sent');
+      } else {
+        console.log('❌ WebSocket not open, cannot send camera control');
+      }
+    } else {
+      console.log('❌ No room selected for camera control');
     }
   });
 
