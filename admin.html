@@ -1,86 +1,119 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Dashboard</title>
-  <style>
-    body { display:flex; flex-direction:column; background:#111; color:#fff; font-family:Arial; height:100vh; margin:0; }
-    #videoArea { display:flex; justify-content:center; gap:10px; padding:10px; }
-    img { width:45%; border:2px solid #0f0; border-radius:8px; }
-    #chat { flex:1; display:flex; flex-direction:column; background:#222; margin:10px; border-radius:8px; }
-    #messages { flex:1; overflow-y:auto; padding:10px; }
-    #inputArea { display:flex; padding:10px; background:#333; }
-    input { flex:1; padding:8px; border:none; border-radius:5px; }
-    button { margin-left:8px; padding:8px 12px; background:#0f0; border:none; border-radius:5px; cursor:pointer; }
-    .you { text-align:right; color:#0f0; }
-    .client { text-align:left; color:#00aaff; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin Chat + Video</title>
+<style>
+body{margin:0;font-family:Segoe UI,Roboto,Arial;background:#0b0b0b;color:#dfffdc}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#021002;color:#2EA144}
+h1{margin:0;font-size:18px}
+.container{display:flex;flex-wrap:wrap;gap:12px;padding:12px}
+.video-container{flex:1 1 45%;background:#011001;padding:6px;border-radius:8px;display:flex;flex-direction:column;align-items:center}
+.video-container video{width:100%;border-radius:6px;background:#000}
+.video-container h2{margin:6px 0 4px 0;font-size:14px;color:#2EA144}
+.video-container .status{font-size:11px;color:#9fe;text-align:center;margin-bottom:4px}
+.chat-container{flex:1 1 100%;display:flex;flex-direction:column;background:#011001;border-radius:8px;height:400px;overflow:hidden;margin-top:12px}
+#chat{flex:1;overflow:auto;padding:8px}
+.row{display:flex;margin:6px 0}
+.row.me{justify-content:flex-end}
+.bubble{max-width:70%;padding:6px 10px;border-radius:14px;background:#0b4f2a;font-size:14px;line-height:1.2}
+.row.me .bubble{background:#2EA144;color:#001}
+.meta{font-size:10px;color:#9fe;margin-top:2px;text-align:right}
+.controls{display:flex;padding:6px;border-top:1px solid #023;background:#011001}
+.controls input{flex:1;padding:6px;border-radius:6px;border:1px solid #234;background:#091009;color:#dfffdc}
+.controls button{margin-left:6px;padding:6px 10px;background:#2EA144;border:none;color:#001;border-radius:6px;cursor:pointer}
+</style>
 </head>
 <body>
-  <h2 style="text-align:center;">Chat Admin</h2>
-  <div id="videoArea">
-    <img id="frontCam" alt="Frontale">
-    <img id="backCam" alt="Posteriore">
+<header>
+  <h1>Admin — Chat + Video</h1>
+  <div id="status">Connesso</div>
+</header>
+
+<div class="container">
+  <div class="video-container">
+    <h2>Camera Posteriore</h2>
+    <video id="video-back" autoplay muted playsinline></video>
+    <div class="status" id="status-back">Offline</div>
   </div>
-
-  <div id="chat">
-    <div id="messages"></div>
-    <div id="inputArea">
-      <input id="msgInput" placeholder="Scrivi...">
-      <button id="sendBtn">Invia</button>
-      <button id="switchFront">Frontale</button>
-      <button id="switchBack">Posteriore</button>
-    </div>
+  <div class="video-container">
+    <h2>Camera Frontale</h2>
+    <video id="video-front" autoplay muted playsinline></video>
+    <div class="status" id="status-front">Offline</div>
   </div>
+</div>
 
-  <script>
-    const ws = new WebSocket(`wss://${location.host}/ws?role=admin`);
-    const messages = document.getElementById('messages');
-    const input = document.getElementById('msgInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const frontCam = document.getElementById('frontCam');
-    const backCam = document.getElementById('backCam');
+<div class="chat-container">
+  <div id="chat"></div>
+  <div class="controls">
+    <input type="text" id="text" placeholder="Scrivi un messaggio..." />
+    <button id="sendBtn">Invia</button>
+  </div>
+</div>
 
-    sendBtn.onclick = sendMessage;
-    input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
-    document.getElementById('switchFront').onclick = () => switchCamera('user');
-    document.getElementById('switchBack').onclick = () => switchCamera('environment');
+<script>
+const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=admin`);
+const chatEl = document.getElementById('chat');
+const textIn = document.getElementById('text');
+const sendBtn = document.getElementById('sendBtn');
+const statusEl = document.getElementById('status');
+const videoBack = document.getElementById('video-back');
+const videoFront = document.getElementById('video-front');
+const statusBack = document.getElementById('status-back');
+const statusFront = document.getElementById('status-front');
 
-    function sendMessage() {
-      const text = input.value.trim();
-      if (!text) return;
-      ws.send(JSON.stringify({ type: 'chat', text, room: 'user1' }));
-      addMessage('Tu', text, 'you');
-      input.value = '';
-    }
+function addMessage(from,text,me=false){
+  const row=document.createElement('div');
+  row.className='row'+(me?' me':'');
+  const bubble=document.createElement('div');
+  bubble.className='bubble';
+  bubble.innerHTML=`<div>${text}</div><div class="meta">${from} • ${new Date().toLocaleTimeString()}</div>`;
+  row.appendChild(bubble);
+  chatEl.appendChild(row);
+  chatEl.scrollTop=chatEl.scrollHeight;
+}
 
-    function addMessage(sender, text, cls) {
-      const div = document.createElement('div');
-      div.className = cls;
-      div.textContent = `${sender}: ${text}`;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
-    }
-
-    function switchCamera(camera) {
-      ws.send(JSON.stringify({ type: 'switch_camera', room: 'user1', camera }));
-      addMessage('Sistema', `Richiesta cambio fotocamera (${camera})`, 'you');
-    }
-
-    ws.onmessage = e => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'chat') {
-        addMessage('Client', msg.text, 'client');
-      }
-      if (msg.type === 'video') {
-        if (msg.image) {
-          if (msg.room === 'user1') {
-            if (msg.camera === 'user') frontCam.src = msg.image;
-            else backCam.src = msg.image;
-          }
+ws.addEventListener('open',()=>statusEl.textContent='Connesso');
+ws.addEventListener('close',()=>statusEl.textContent='Disconnesso');
+ws.addEventListener('message',e=>{
+  try{
+    const data=JSON.parse(e.data);
+    if(data.type==='chat') addMessage(data.from,data.text,false);
+    else if(data.type==='video'){
+      const img=new Image();
+      img.src=data.image;
+      img.onload=()=>{
+        if(data.cam==='back'){
+          const ctx=document.createElement('canvas').getContext('2d');
+          ctx.canvas.width=videoBack.videoWidth||320;
+          ctx.canvas.height=videoBack.videoHeight||240;
+          ctx.drawImage(img,0,0,ctx.canvas.width,ctx.canvas.height);
+          videoBack.srcObject=null;
+          videoBack.src=ctx.canvas.toDataURL('image/jpeg');
+          statusBack.textContent='Live';
+        } else if(data.cam==='front'){
+          const ctx=document.createElement('canvas').getContext('2d');
+          ctx.canvas.width=videoFront.videoWidth||320;
+          ctx.canvas.height=videoFront.videoHeight||240;
+          ctx.drawImage(img,0,0,ctx.canvas.width,ctx.canvas.height);
+          videoFront.srcObject=null;
+          videoFront.src=ctx.canvas.toDataURL('image/jpeg');
+          statusFront.textContent='Live';
         }
       }
-    };
-  </script>
+    }
+  }catch(err){console.error(err);}
+});
+
+sendBtn.onclick=()=>{
+  const text=textIn.value.trim();
+  if(!text) return;
+  const msg={type:'chat',from:'Admin',text};
+  ws.send(JSON.stringify(msg));
+  addMessage('Tu',text,true);
+  textIn.value='';
+};
+</script>
 </body>
 </html>
