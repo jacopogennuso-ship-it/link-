@@ -461,6 +461,12 @@ function handleLogin() {
   // Save room to localStorage
   localStorage.setItem('clientRoom', room);
   
+  // Check if we have a saved room ID for reconnection
+  const savedRoomId = localStorage.getItem('clientRoomId');
+  if (savedRoomId) {
+    console.log(`🏠 Found saved room ID: ${savedRoomId}`);
+  }
+  
   loginContainer.style.display = 'none';
   chatContainer.style.display = 'flex';
   
@@ -528,11 +534,14 @@ function connectWebSocket() {
       startCamera();
     }
     
-    // Send room selection to server
-    ws.send(JSON.stringify({ type: 'selectRoom', room: room }));
-    
-    // Start heartbeat to keep connection alive in PWA
-    startHeartbeat();
+            // Send room selection to server
+            ws.send(JSON.stringify({ type: 'selectRoom', room: room }));
+            
+            // Load messages from localStorage
+            loadMessagesFromLocalStorage();
+            
+            // Start heartbeat to keep connection alive in PWA
+            startHeartbeat();
   });
   
   ws.addEventListener('close', (event) => {
@@ -748,6 +757,14 @@ function setupChatFunctionality() {
         showInAppNotification(data.title, data.body);
       }
       
+      if (data.type === 'roomInfo') {
+        console.log('Room info received:', data);
+        // Store room info for reconnection
+        localStorage.setItem('clientRoomInfo', JSON.stringify(data));
+        localStorage.setItem('clientRoomId', data.roomId);
+        console.log(`🏠 Room ID saved: ${data.roomId}`);
+      }
+      
       if (data.type === 'cameraControl') {
         console.log('Camera control received:', data.camera);
         if (data.camera !== currentCamera) {
@@ -815,6 +832,105 @@ function addMessage(from, text, me = false, attachment = null, timestamp = null)
   messageEl.appendChild(bubbleEl);
   messagesEl.appendChild(messageEl);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+  
+  // Save message to localStorage
+  saveMessageToLocalStorage(from, text, me, attachment, timestamp);
+}
+
+// Save message to localStorage
+function saveMessageToLocalStorage(from, text, me = false, attachment = null, timestamp = null) {
+  try {
+    const message = {
+      from,
+      text,
+      me,
+      attachment,
+      timestamp: timestamp || new Date().toISOString()
+    };
+    
+    const roomId = localStorage.getItem('clientRoomId') || room;
+    const key = `chat_${roomId}`;
+    const existingMessages = JSON.parse(localStorage.getItem(key) || '[]');
+    existingMessages.push(message);
+    
+    // Keep only last 100 messages to avoid localStorage overflow
+    if (existingMessages.length > 100) {
+      existingMessages.splice(0, existingMessages.length - 100);
+    }
+    
+    localStorage.setItem(key, JSON.stringify(existingMessages));
+    console.log(`💾 Message saved to localStorage for room ${roomId}`);
+  } catch (error) {
+    console.error('Error saving message to localStorage:', error);
+  }
+}
+
+// Load messages from localStorage
+function loadMessagesFromLocalStorage() {
+  try {
+    const roomId = localStorage.getItem('clientRoomId') || room;
+    const key = `chat_${roomId}`;
+    const messages = JSON.parse(localStorage.getItem(key) || '[]');
+    
+    console.log(`📚 Loading ${messages.length} messages from localStorage for room ${roomId}`);
+    
+    // Clear existing messages
+    const messagesEl = document.getElementById('chatMessages');
+    if (messagesEl) {
+      messagesEl.innerHTML = '';
+      
+      // Load all messages
+      messages.forEach(msg => {
+        addMessageToDOM(msg.from, msg.text, msg.me, msg.attachment, msg.timestamp);
+      });
+      
+      // Scroll to bottom
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  } catch (error) {
+    console.error('Error loading messages from localStorage:', error);
+  }
+}
+
+// Add message to DOM without saving to localStorage
+function addMessageToDOM(from, text, me = false, attachment = null, timestamp = null) {
+  const messagesEl = document.getElementById('chatMessages');
+  if (!messagesEl) return;
+  
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${me ? 'sent' : 'received'}`;
+  
+  const bubbleEl = document.createElement('div');
+  bubbleEl.className = 'message-bubble';
+  
+  if (text) {
+    bubbleEl.innerHTML = `<div>${text}</div>`;
+  }
+  
+  if (attachment) {
+    const attachmentEl = document.createElement('div');
+    attachmentEl.className = 'attachment';
+    
+    if (attachment.type === 'image') {
+      attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
+    } else {
+      attachmentEl.innerHTML = `
+        <div class="attachment-file">
+          <span>📎</span>
+          <span>${attachment.name}</span>
+        </div>
+      `;
+    }
+    bubbleEl.appendChild(attachmentEl);
+  }
+  
+  const timeEl = document.createElement('div');
+  timeEl.className = 'message-time';
+  timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+  bubbleEl.appendChild(timeEl);
+  
+  messageEl.appendChild(bubbleEl);
+  messagesEl.appendChild(messageEl);
 }
 
 // Send message
@@ -1036,16 +1152,85 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Request notification permission
+// Request notification permission and subscribe to push
 if ('Notification' in window) {
   Notification.requestPermission().then(permission => {
     console.log('Notification permission:', permission);
     if (permission === 'granted') {
       console.log('✅ Notifications enabled');
+      // Subscribe to push notifications
+      subscribeToPush();
     } else {
       console.log('❌ Notifications disabled');
     }
   });
+}
+
+// Subscribe to push notifications
+async function subscribeToPush() {
+  try {
+    // Check if service worker is supported
+    if (!('serviceWorker' in navigator)) {
+      console.log('Service Worker not supported');
+      return null;
+    }
+    
+    // Check if push is supported
+    if (!('PushManager' in window)) {
+      console.log('Push not supported');
+      return null;
+    }
+    
+    // Get VAPID public key from server
+    const response = await fetch('/vapid-public-key');
+    const { publicKey } = await response.json();
+    
+    // Register service worker
+    const registration = await navigator.serviceWorker.register('/sw-push.js');
+    console.log('Service Worker registered:', registration);
+    
+    // Subscribe to push
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    
+    console.log('Push subscription:', subscription);
+    
+    // Send subscription to server
+    await fetch('/subscribe-push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        subscription: subscription,
+        room: room
+      })
+    });
+    
+    console.log('✅ Push subscription sent to server');
+    return subscription;
+  } catch (error) {
+    console.error('Push subscription error:', error);
+    return null;
+  }
+}
+
+// Convert VAPID key to Uint8Array
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 } else {
   console.log('❌ Notifications not supported');
 }

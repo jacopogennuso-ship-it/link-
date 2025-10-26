@@ -3,6 +3,7 @@ const ws = require('ws');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const webpush = require('web-push');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -42,16 +43,89 @@ app.post('/upload', upload.single('file'), (req, res) => {
   });
 });
 
+// Push subscription endpoint
+app.post('/subscribe-push', (req, res) => {
+  try {
+    const { subscription, room } = req.body;
+    
+    if (!subscription || !room) {
+      return res.status(400).json({ error: 'Missing subscription or room' });
+    }
+    
+    // Load existing subscriptions
+    const subscriptions = loadPushSubscriptions();
+    
+    // Add new subscription
+    subscriptions.set(room, subscription);
+    
+    // Save to file
+    savePushSubscriptions(subscriptions);
+    
+    console.log(`📱 Push subscription saved for room: ${room}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Push subscription error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// VAPID public key endpoint
+app.get('/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
 const wss = new ws.Server({ noServer: true });
 const clients = new Map(); // room -> ws
 const admins = new Set();
 const rooms = new Set(); // Track available rooms
 const chatHistory = new Map(); // room -> messages array
+const roomData = new Map(); // room -> { id, name, createdAt, lastActivity }
 const CHAT_HISTORY_FILE = './data/chat-history.json';
+const ROOMS_DATA_FILE = './data/rooms-data.json';
+const PUSH_SUBSCRIPTIONS_FILE = './data/push-subscriptions.json';
+
+// VAPID Keys (genera su https://vapidkeys.com/)
+const VAPID_PUBLIC_KEY = 'BB8FYQIMEa7-25gltUu85BZY5plHQt962LWvr4EztI2oChOCzDA5rmdRl8HF3s7psoyynwRche6Fwue3AYuvfhU';
+const VAPID_PRIVATE_KEY = 'IUuMBnSYPtSdKf1l-VrKHhxF2yfzw1IUGsQR5fh1P0c';
+
+// Configure VAPID
+webpush.setVapidDetails(
+  'mailto:jacopo.gennuso@gmail.com',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
 // Ensure data directory exists
 if (!fs.existsSync('./data')) {
   fs.mkdirSync('./data', { recursive: true });
+}
+
+// Room management functions
+function generateRoomId() {
+  return 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function createRoom(roomName) {
+  const roomId = generateRoomId();
+  const roomData = {
+    id: roomId,
+    name: roomName,
+    createdAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString()
+  };
+  
+  console.log(`🏠 Created room: ${roomName} with ID: ${roomId}`);
+  return { roomId, roomData };
+}
+
+function updateRoomActivity(roomId) {
+  if (roomData.has(roomId)) {
+    const data = roomData.get(roomId);
+    data.lastActivity = new Date().toISOString();
+    roomData.set(roomId, data);
+    // Save rooms data when updated
+    saveRoomsData();
+  }
 }
 
 // Load chat history from file
@@ -81,28 +155,117 @@ function saveChatHistory() {
   }
 }
 
-// Load chat history on startup
-loadChatHistory();
+// Load rooms data from file
+function loadRoomsData() {
+  try {
+    if (fs.existsSync(ROOMS_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ROOMS_DATA_FILE, 'utf8'));
+      roomData.clear();
+      Object.entries(data).forEach(([room, roomInfo]) => {
+        roomData.set(room, roomInfo);
+        rooms.add(room);
+      });
+      console.log('Rooms data loaded from file');
+    }
+  } catch (error) {
+    console.error('Error loading rooms data:', error);
+  }
+}
 
-// Save chat history every 30 seconds as backup
+// Save rooms data to file
+function saveRoomsData() {
+  try {
+    const data = Object.fromEntries(roomData);
+    fs.writeFileSync(ROOMS_DATA_FILE, JSON.stringify(data, null, 2));
+    console.log('Rooms data saved to file');
+  } catch (error) {
+    console.error('Error saving rooms data:', error);
+  }
+}
+
+// Load push subscriptions from file
+function loadPushSubscriptions() {
+  try {
+    if (fs.existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PUSH_SUBSCRIPTIONS_FILE, 'utf8'));
+      return new Map(Object.entries(data));
+    }
+  } catch (error) {
+    console.error('Error loading push subscriptions:', error);
+  }
+  return new Map();
+}
+
+// Save push subscriptions to file
+function savePushSubscriptions(subscriptions) {
+  try {
+    const data = Object.fromEntries(subscriptions);
+    fs.writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
+    console.log('Push subscriptions saved to file');
+  } catch (error) {
+    console.error('Error saving push subscriptions:', error);
+  }
+}
+
+// Send push notification
+async function sendPushNotification(room, title, message) {
+  try {
+    const subscriptions = loadPushSubscriptions();
+    const subscription = subscriptions.get(room);
+    
+    if (!subscription) {
+      console.log(`❌ No push subscription found for room: ${room}`);
+      return;
+    }
+    
+    const payload = JSON.stringify({
+      title: title,
+      body: message,
+      icon: '/icons/icon-192x192.svg',
+      badge: '/icons/icon-72x72.svg',
+      tag: 'jacopo-chat',
+      requireInteraction: true,
+      data: {
+        room: room,
+        timestamp: Date.now()
+      }
+    });
+    
+    await webpush.sendNotification(subscription, payload);
+    console.log(`📤 Push notification sent to room ${room}: ${message}`);
+  } catch (error) {
+    console.error('Push notification error:', error);
+  }
+}
+
+// Load data on startup
+loadChatHistory();
+loadRoomsData();
+
+// Save data every 30 seconds as backup
 setInterval(() => {
   if (chatHistory.size > 0) {
     saveChatHistory();
+  }
+  if (roomData.size > 0) {
+    saveRoomsData();
   }
 }, 30000);
 
 const server = app.listen(PORT, ()=>console.log(`Server attivo su http://localhost:${PORT}`));
 
-// Save chat history on server shutdown
+// Save data on server shutdown
 process.on('SIGINT', () => {
-  console.log('Saving chat history before shutdown...');
+  console.log('Saving data before shutdown...');
   saveChatHistory();
+  saveRoomsData();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('Saving chat history before shutdown...');
+  console.log('Saving data before shutdown...');
   saveChatHistory();
+  saveRoomsData();
   process.exit(0);
 });
 
@@ -119,15 +282,34 @@ wss.on('connection', (ws, req)=>{
   ws.room = room;
 
   if(role==='client' && room) {
+    // Check if room exists, create if not
+    if (!roomData.has(room)) {
+      const { roomId, roomData: newRoomData } = createRoom(room);
+      roomData.set(room, newRoomData);
+    }
+    
     clients.set(room, ws);
     rooms.add(room);
+    updateRoomActivity(room);
+    
     console.log(`📱 Client connected to room: ${room}`);
     console.log(`📊 Total rooms: ${rooms.size}, Total clients: ${clients.size}`);
+    
+    // Send room ID to client
+    ws.send(JSON.stringify({ 
+      type: 'roomInfo', 
+      roomId: roomData.get(room).id,
+      roomName: room 
+    }));
     
     // Notify admins about new client
     admins.forEach(a=>{
       if(a.readyState===ws.OPEN) {
-        a.send(JSON.stringify({ type:'clientConnected', room }));
+        a.send(JSON.stringify({ 
+          type:'clientConnected', 
+          room,
+          roomId: roomData.get(room).id 
+        }));
         console.log(`📤 Notified admin about client connection: ${room}`);
       }
     });
@@ -137,9 +319,23 @@ wss.on('connection', (ws, req)=>{
     console.log(`👨‍💼 Admin connected. Total admins: ${admins.size}`);
     console.log(`📊 Available rooms: ${Array.from(rooms)}`);
     
-    // Send list of available rooms to new admin
-    ws.send(JSON.stringify({ type:'roomsList', rooms: Array.from(rooms) }));
-    console.log(`📤 Sent rooms list to admin: ${Array.from(rooms)}`);
+    // Send list of available rooms with metadata to new admin
+    const roomsList = Array.from(rooms).map(room => {
+      const data = roomData.get(room);
+      return {
+        room,
+        roomId: data ? data.id : null,
+        name: data ? data.name : room,
+        createdAt: data ? data.createdAt : null,
+        lastActivity: data ? data.lastActivity : null
+      };
+    });
+    
+    ws.send(JSON.stringify({ 
+      type:'roomsList', 
+      rooms: roomsList 
+    }));
+    console.log(`📤 Sent rooms list to admin: ${roomsList.length} rooms`);
   }
 
   ws.on('message', msg=>{
@@ -168,6 +364,7 @@ wss.on('connection', (ws, req)=>{
         saveChatHistory();
         
         if(ws.role==='client'){
+          // Send client message to all admins
           admins.forEach(a=>{
             if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
               type:'chat', 
@@ -202,9 +399,18 @@ wss.on('connection', (ws, req)=>{
                 timestamp: Date.now()
               }));
               
+              // Send real push notification (external)
+              sendPushNotification(targetRoom, 'Nuovo messaggio da Admin', message.text);
+              
               console.log(`📤 Push notification sent to room ${targetRoom}: ${message.text}`);
             }
           }
+          
+          // Send admin message back to admin for display
+          ws.send(JSON.stringify({ 
+            type:'chat', 
+            ...message
+          }));
         }
       }
 
