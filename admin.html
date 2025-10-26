@@ -1,49 +1,173 @@
+<!-- admin.html -->
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Admin</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin — Dashboard</title>
 <style>
-  body { background:#000; color:#0f0; font-family:Arial; padding:10px; }
-  #chat { border:1px solid #0f0; height:300px; overflow-y:auto; padding:5px; margin-bottom:10px; }
-  input, button { padding:6px; font-size:14px; margin-top:4px; }
-  #videoFeed { width:100%; border:1px solid #0f0; margin-top:10px; display:none; }
+  body{margin:0;font-family:Segoe UI,Roboto,Helvetica,Arial;background:#050805;color:#dfffdc}
+  .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:12px;height:100vh;padding:12px}
+  .panel{background:#061006;border:1px solid #0b3;padding:12px;border-radius:8px;overflow:auto}
+  .clients li{padding:8px;border-radius:6px;cursor:pointer}
+  .clients li:hover{background:#0b2}
+  #chat{height:60vh;overflow:auto;padding:8px}
+  .bubble{max-width:80%;padding:8px 12px;border-radius:14px;margin:8px 0}
+  .bubble.admin{background:#2EA144;color:#001}
+  .bubble.client{background:#0b4f2a;color:#dfffdc;margin-left:auto}
+  .controls{display:flex;gap:8px;margin-top:8px}
+  input[type="text"]{flex:1;padding:8px;border-radius:6px;border:1px solid #0b3;background:#021002;color:#dfffdc}
+  button{background:#2EA144;border:none;padding:8px;border-radius:6px;cursor:pointer}
+  .video-slot{background:#000;border:1px solid #123;height:200px;margin-bottom:8px;display:flex;align-items:center;justify-content:center}
+  .video-slot img{max-width:100%;max-height:100%;display:block}
+  .slot-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 </style>
 </head>
 <body>
-<h2>Admin Panel</h2>
-<div id="chat"></div>
-<input id="msg" placeholder="Scrivi un messaggio..." />
-<button onclick="sendMsg()">Invia</button>
-<img id="videoFeed">
+  <div class="layout">
+    <div class="panel">
+      <h3>Clients</h3>
+      <ul id="clientsList" class="clients"></ul>
+      <div style="margin-top:12px">
+        <button id="refreshClients">Aggiorna lista</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Chat</h3>
+      <div id="chat"></div>
+      <div class="controls">
+        <input id="msg" placeholder="Scrivi un messaggio..."/>
+        <button id="send">Invia</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="slot-header"><strong>Slot A</strong><select id="slotA" style="background:#021002;color:#dfffdc"></select></div>
+      <div id="slotAbox" class="video-slot">Nessun video</div>
+
+      <div class="slot-header"><strong>Slot B</strong><select id="slotB" style="background:#021002;color:#dfffdc"></select></div>
+      <div id="slotBbox" class="video-slot">Nessun video</div>
+    </div>
+  </div>
 
 <script>
-const ws = new WebSocket(`ws://${location.host}/ws?role=admin`);
-const chat = document.getElementById('chat');
-const msgInput = document.getElementById('msg');
-const videoFeed = document.getElementById('videoFeed');
-let currentRoom = 'user1';
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=admin`);
+  const clientsListEl = document.getElementById('clientsList');
+  const chatEl = document.getElementById('chat');
+  const msgIn = document.getElementById('msg');
+  const sendBtn = document.getElementById('send');
+  const slotA = document.getElementById('slotA');
+  const slotB = document.getElementById('slotB');
+  const slotAbox = document.getElementById('slotAbox');
+  const slotBbox = document.getElementById('slotBbox');
+  const refreshBtn = document.getElementById('refreshClients');
 
-ws.onmessage = (e) => {
-  const data = JSON.parse(e.data);
+  let currentRoom = null;
 
-  if (data.type === 'chat') {
-    chat.innerHTML += `<div><b>${data.from}:</b> ${data.text}</div>`;
-    chat.scrollTop = chat.scrollHeight;
-  } else if (data.type === 'video' && data.image) {
-    videoFeed.src = data.image;
-    videoFeed.style.display = 'block';
+  function addChatBubble(from, text, isAdmin=false) {
+    const div = document.createElement('div');
+    div.className = 'bubble ' + (isAdmin ? 'admin' : 'client');
+    div.innerHTML = `<div style="font-size:12px;color:#bff">${from}</div><div>${text}</div><div style="font-size:10px;color:#9fe">${new Date().toLocaleTimeString()}</div>`;
+    chatEl.appendChild(div);
+    chatEl.scrollTop = chatEl.scrollHeight;
   }
-};
 
-function sendMsg() {
-  const text = msgInput.value.trim();
-  if (!text) return;
-  ws.send(JSON.stringify({ type: 'chat', from: 'Admin', text, room: currentRoom }));
-  chat.innerHTML += `<div><b>Tu:</b> ${text}</div>`;
-  msgInput.value = '';
-}
+  ws.onopen = () => {
+    console.log('Admin WS open');
+    ws.send(JSON.stringify({ type:'listClients' }));
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'clientsList') {
+        populateClients(data.clients);
+      } else if (data.type === 'clientConnected') {
+        addClientToList(data.room);
+      } else if (data.type === 'clientDisconnected') {
+        removeClientFromList(data.room);
+      } else if (data.type === 'chat') {
+        addChatBubble(data.from, data.text, false);
+      } else if (data.type === 'video') {
+        // update video slot(s) if selected
+        // If the incoming video is from room selected in slotA, update slotAbox, similarly for slotB
+        if (slotA.value === data.room) updateSlot(slotAbox, data.image);
+        if (slotB.value === data.room) updateSlot(slotBbox, data.image);
+      } else if (data.type === 'cameraStatus') {
+        // show small notification in chat area
+        addChatBubble('System', `Camera ${data.room} status: ${data.status}`, true);
+      }
+    } catch (err) {
+      console.warn('Invalid message', e.data);
+    }
+  };
+
+  function populateClients(list) {
+    clientsListEl.innerHTML = '';
+    slotA.innerHTML = '<option value="">— nessuno —</option>';
+    slotB.innerHTML = '<option value="">— nessuno —</option>';
+    list.forEach(r => addClientToList(r));
+  }
+
+  function addClientToList(room) {
+    // avoid duplicates
+    if (Array.from(clientsListEl.children).some(li => li.dataset.room === room)) return;
+    const li = document.createElement('li');
+    li.textContent = room;
+    li.dataset.room = room;
+    li.onclick = () => { currentRoom = room; highlightSelected(room); };
+    clientsListEl.appendChild(li);
+
+    // also add to selects
+    const optA = document.createElement('option'); optA.value = room; optA.text = room; slotA.appendChild(optA);
+    const optB = document.createElement('option'); optB.value = room; optB.text = room; slotB.appendChild(optB);
+  }
+
+  function removeClientFromList(room) {
+    Array.from(clientsListEl.children).forEach(li => { if (li.dataset.room === room) li.remove(); });
+    Array.from(slotA.options).forEach(o => { if (o.value === room) o.remove(); });
+    Array.from(slotB.options).forEach(o => { if (o.value === room) o.remove(); });
+    if (slotA.value === room) { slotA.value=''; slotAbox.innerHTML='Nessun video'; }
+    if (slotB.value === room) { slotB.value=''; slotBbox.innerHTML='Nessun video'; }
+  }
+
+  function highlightSelected(room) {
+    Array.from(clientsListEl.children).forEach(li => li.style.background = li.dataset.room === room ? '#0b2' : 'transparent');
+  }
+
+  sendBtn.onclick = () => {
+    const text = msgIn.value.trim();
+    if (!text || !currentRoom) return alert('Seleziona un client dalla lista a sinistra prima di inviare');
+    const msg = { type:'chat', from:'Admin', text, room: currentRoom };
+    ws.send(JSON.stringify(msg));
+    addChatBubble('You (Admin)', text, true);
+    msgIn.value = '';
+  };
+
+  refreshBtn.onclick = () => ws.send(JSON.stringify({ type:'listClients' }));
+
+  slotA.onchange = () => {
+    slotAbox.innerHTML = 'Nessun video';
+    // optionally notify client to show camera modal (request)
+    if (slotA.value) {
+      ws.send(JSON.stringify({ type: 'requestCamera', room: slotA.value, action:'ask' }));
+    }
+  };
+
+  slotB.onchange = () => {
+    slotBbox.innerHTML = 'Nessun video';
+    if (slotB.value) {
+      ws.send(JSON.stringify({ type: 'requestCamera', room: slotB.value, action:'ask' }));
+    }
+  };
+
+  function updateSlot(slotEl, dataUrl) {
+    slotEl.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    slotEl.appendChild(img);
+  }
 </script>
 </body>
 </html>
