@@ -3,7 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WhatsApp Chat</title>
+<title>Jacopo Chat</title>
+
+<!-- PWA Meta Tags -->
+<meta name="theme-color" content="#25d366">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jacopo Chat">
+<meta name="apple-touch-fullscreen" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Jacopo Chat">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- PWA Icons -->
+<link rel="apple-touch-icon" href="/icons/icon-152x152.svg">
+<link rel="icon" type="image/svg+xml" sizes="32x32" href="/icons/icon-32x32.svg">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="/icons/icon-16x16.svg">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { 
@@ -490,6 +507,19 @@ function setupChatFunctionality() {
         addMessage(data.from, data.text, false, data.attachment, data.timestamp);
       }
       
+      if (data.type === 'pushNotification') {
+        // Show browser notification
+        if (Notification.permission === 'granted') {
+          new Notification(data.title, {
+            body: data.body,
+            icon: data.icon,
+            badge: '/icons/icon-72x72.svg',
+            tag: 'jacopo-chat',
+            requireInteraction: true
+          });
+        }
+      }
+      
       if (data.type === 'cameraControl') {
         console.log('Camera control received:', data.camera);
         if (data.camera !== currentCamera) {
@@ -762,10 +792,120 @@ function checkClientSession() {
   return false;
 }
 
+// Initialize PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(registration => {
+      console.log('SW registered: ', registration);
+    })
+    .catch(registrationError => {
+      console.log('SW registration failed: ', registrationError);
+    });
+}
+
+// Request notification permission
+if ('Notification' in window) {
+  Notification.requestPermission().then(permission => {
+    console.log('Notification permission:', permission);
+  });
+}
+
+// PWA Install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log('PWA install prompt triggered');
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  // Show install button
+  showInstallButton();
+});
+
+function showInstallButton() {
+  const installBtn = document.createElement('button');
+  installBtn.innerHTML = '📱 Installa App';
+  installBtn.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #25d366;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  `;
+  
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('PWA install outcome:', outcome);
+      deferredPrompt = null;
+      installBtn.remove();
+    }
+  });
+  
+  document.body.appendChild(installBtn);
+  
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    if (installBtn.parentNode) {
+      installBtn.remove();
+    }
+  }, 10000);
+}
+
+// Manual install button for macOS
+function addManualInstallButton() {
+  const installBtn = document.createElement('button');
+  installBtn.innerHTML = '📱 Installa App';
+  installBtn.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #25d366;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  `;
+  
+  installBtn.addEventListener('click', () => {
+    // Show instructions for manual install
+    alert(`Per installare l'app su macOS:
+
+1. Safari: Menu Safari > Aggiungi a Dock
+2. Chrome: Menu ⋮ > Installa "Jacopo Chat"
+3. Firefox: Menu ⋮ > Installa
+
+Oppure usa il pulsante "Condividi" e "Aggiungi alla schermata Home"`);
+  });
+  
+  document.body.appendChild(installBtn);
+  
+  // Auto-hide after 15 seconds
+  setTimeout(() => {
+    if (installBtn.parentNode) {
+      installBtn.remove();
+    }
+  }, 15000);
+}
+
 // Initialize login on page load
 if (!checkClientSession()) {
   initializeLogin();
 }
+
+// Add manual install button after 3 seconds
+setTimeout(addManualInstallButton, 3000);
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

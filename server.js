@@ -151,6 +151,9 @@ wss.on('connection', (ws, req)=>{
         }
         chatHistory.get(room).push(message);
         
+        console.log(`Message saved for room ${room}:`, message);
+        console.log(`Total messages in room ${room}:`, chatHistory.get(room).length);
+        
         // Save to file after adding message
         saveChatHistory();
         
@@ -166,10 +169,20 @@ wss.on('connection', (ws, req)=>{
           const targetRoom = data.room || ws.selectedRoom;
           if(targetRoom && clients.has(targetRoom)){
             const c=clients.get(targetRoom);
-            if(c.readyState===ws.OPEN) c.send(JSON.stringify({ 
-              type:'chat', 
-              ...message
-            }));
+            if(c.readyState===ws.OPEN) {
+              c.send(JSON.stringify({ 
+                type:'chat', 
+                ...message
+              }));
+              
+              // Send push notification to client
+              c.send(JSON.stringify({
+                type: 'pushNotification',
+                title: 'Nuovo messaggio da Admin',
+                body: message.text,
+                icon: '/icons/icon-192x192.svg'
+              }));
+            }
           }
         }
       }

@@ -112,6 +112,10 @@ uploads/
 # Data directory (chat history, etc.)
 data/
 
+# Generated icons
+icons/*.png
+generate-icons.js
+
 # OS generated files
 .DS_Store
 .DS_Store?
