@@ -966,16 +966,42 @@ function initializeWebSocket() {
     }
   }
 
+  let adminAudioContext = null;
+  let adminAudioQueue = [];
+  let isPlayingAudio = false;
+
   function updateAudioStream(audioData, sampleRate) {
     const audioIndicator = document.getElementById('audioIndicator');
     if (audioIndicator) {
       audioIndicator.style.display = 'flex';
       
-      // Convert base64 back to audio buffer and play
+      // Add audio data to queue
+      adminAudioQueue.push({ audioData, sampleRate });
+      
+      // Start playing if not already playing
+      if (!isPlayingAudio) {
+        playAudioQueue();
+      }
+    }
+  }
+
+  async function playAudioQueue() {
+    if (isPlayingAudio || adminAudioQueue.length === 0) return;
+    
+    isPlayingAudio = true;
+    
+    while (adminAudioQueue.length > 0) {
+      const { audioData, sampleRate } = adminAudioQueue.shift();
+      
       try {
+        // Create or reuse audio context
+        if (!adminAudioContext || adminAudioContext.state === 'closed') {
+          adminAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Convert base64 back to audio buffer
         const audioBuffer = atob(audioData);
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const buffer = audioContext.createBuffer(1, audioBuffer.length / 4, sampleRate);
+        const buffer = adminAudioContext.createBuffer(1, audioBuffer.length / 4, sampleRate);
         const channelData = buffer.getChannelData(0);
         
         // Convert back to float32 array
@@ -989,16 +1015,23 @@ function initializeWebSocket() {
           channelData[i] = float32Array[i];
         }
         
-        const source = audioContext.createBufferSource();
+        // Play audio
+        const source = adminAudioContext.createBufferSource();
         source.buffer = buffer;
-        source.connect(audioContext.destination);
+        source.connect(adminAudioContext.destination);
         source.start();
         
-        console.log('Audio played:', audioData.length, 'bytes, sample rate:', sampleRate);
+        // Wait for audio to finish
+        await new Promise(resolve => {
+          source.onended = resolve;
+        });
+        
       } catch (err) {
         console.error('Error playing audio:', err);
       }
     }
+    
+    isPlayingAudio = false;
   }
 
   function loadChatHistory(messages) {
