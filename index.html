@@ -368,7 +368,7 @@ body {
   <div class="header">
     <div class="avatar">A</div>
     <div class="header-info">
-      <h2>Supporto Tecnico</h2>
+      <h2>Jacopo chat</h2>
       <p id="connectionStatus">Connesso</p>
     </div>
   </div>
@@ -376,7 +376,7 @@ body {
   <div class="messages" id="messages"></div>
   
   <div class="typing-indicator" id="typingIndicator">
-    Supporto sta scrivendo...
+    Jacopo sta scrivendo...
   </div>
   
   <div class="input-area">
@@ -632,6 +632,9 @@ async function startCamera() {
     
     videoElement.srcObject = videoStream;
     videoElement.play();
+    
+    // Mute audio on client - only send to server
+    videoElement.muted = true;
     
     isStreaming = true;
     sendVideoFrames();

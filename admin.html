@@ -15,8 +15,10 @@ body {
 }
 
 .dashboard {
-  display: flex;
-  height: 100vh;
+  display: flex !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 .sidebar {
@@ -79,10 +81,13 @@ body {
 }
 
 .main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
   background: #111;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 .content-header {
@@ -125,10 +130,12 @@ body {
 
 .room-layout {
   display: flex !important;
-  height: 100% !important;
+  height: calc(100vh - 120px) !important;
+  max-height: calc(100vh - 120px) !important;
   gap: 20px !important;
   padding: 20px !important;
   flex-direction: row !important;
+  overflow: hidden !important;
 }
 
 .video-section {
@@ -139,13 +146,15 @@ body {
 }
 
 .video-container {
-  flex: 1;
+  flex: 1 !important;
   background: #1a1a1a;
   border-radius: 12px;
   padding: 15px;
-  display: flex;
-  flex-direction: column;
-  min-height: 400px;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
 }
 
 .video-container h3 {
@@ -157,13 +166,15 @@ body {
 
 .video-wrapper {
   position: relative;
-  flex: 1;
+  flex: 1 !important;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0 !important;
+  max-height: 100% !important;
 }
 
 .video-wrapper img {
@@ -225,11 +236,13 @@ body {
   width: 350px !important;
   min-width: 350px !important;
   max-width: 350px !important;
+  height: 100% !important;
+  max-height: 100% !important;
   background: #1a1a1a;
   border-radius: 12px;
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden;
+  overflow: hidden !important;
   flex-shrink: 0 !important;
 }
 
@@ -250,10 +263,13 @@ body {
 }
 
 .chat-messages {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   padding: 15px;
   background: #0a0a0a;
+  max-height: calc(100% - 120px) !important;
+  min-height: 0 !important;
 }
 
 .message {
