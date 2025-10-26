@@ -176,6 +176,8 @@ body {
   position: relative;
   flex: 1 !important;
   background: #000;
+  aspect-ratio: 9/16 !important;
+  max-height: 400px !important;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -2149,6 +2151,9 @@ function initializeWebSocket() {
     // Save selected room to localStorage
     localStorage.setItem('adminSelectedRoom', room);
     
+    // Reset video stabilization state when changing rooms
+    resetVideoState();
+    
     // Update UI
     document.querySelectorAll('.room-item').forEach(item => {
       item.classList.remove('active');
@@ -2170,17 +2175,16 @@ function initializeWebSocket() {
       <div class="room-layout">
         <div class="video-section">
           <div class="video-container">
-            <h3>Admin Camera</h3>
+            <h3>Client Camera</h3>
             <div class="video-wrapper">
-              <img id="admin-video" style="width: 100%; height: 200px; background: #000; object-fit: cover;" />
+              <img id="client-video" style="width: 100%; height: auto; background: #000; object-fit: cover; border-radius: 8px; aspect-ratio: 9/16;" />
               <div class="video-overlay">
-                <div class="camera-indicator" id="cameraIndicator">Posteriore</div>
-                <div class="video-status" id="status-back">Offline</div>
-                <div class="audio-indicator" id="audioIndicator" style="display: none; background: rgba(37, 211, 102, 0.1); border: 1px solid #25d366; color: #25d366; padding: 4px 8px; border-radius: 12px; font-size: 12px;">🎤 Audio Live</div>
+                <div class="camera-indicator" id="clientCameraIndicator">Posteriore</div>
+                <div class="video-status" id="client-status">Offline</div>
+                <div class="audio-indicator" id="clientAudioIndicator" style="display: none; background: rgba(37, 211, 102, 0.1); border: 1px solid #25d366; color: #25d366; padding: 4px 8px; border-radius: 12px; font-size: 12px;">🎤 Audio Live</div>
               </div>
             </div>
             <div class="camera-controls-local">
-              <button id="startCameraBtn" class="camera-btn">Avvia Camera</button>
               <button id="stopCameraBtn" class="camera-btn" style="display: none;">Ferma Camera</button>
             </div>
           </div>
@@ -2249,45 +2253,10 @@ function initializeWebSocket() {
   }
 
   function setupAdminCamera() {
-    const startCameraBtn = document.getElementById('startCameraBtn');
     const stopCameraBtn = document.getElementById('stopCameraBtn');
     const cameraIndicator = document.getElementById('cameraIndicator');
     const statusElement = document.getElementById('status-back');
     
-    if (startCameraBtn) {
-      startCameraBtn.addEventListener('click', async () => {
-        try {
-          console.log('🎥 Starting admin camera...');
-          const constraints = {
-            video: {
-              facingMode: currentCamera === 'front' ? 'user' : 'environment',
-              width: { ideal: 640 },
-              height: { ideal: 480 }
-            }
-          };
-          
-          adminVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
-          adminVideoElement = document.getElementById('admin-video');
-          
-          if (adminVideoElement) {
-            adminVideoElement.srcObject = adminVideoStream;
-            adminVideoElement.play();
-            
-            startCameraBtn.style.display = 'none';
-            stopCameraBtn.style.display = 'inline-block';
-            cameraIndicator.textContent = currentCamera === 'front' ? 'Frontale' : 'Posteriore';
-            statusElement.textContent = 'Online';
-            statusElement.style.color = '#28a745';
-            
-            console.log('✅ Admin camera started successfully');
-          }
-        } catch (error) {
-          console.error('❌ Error starting admin camera:', error);
-          statusElement.textContent = 'Errore';
-          statusElement.style.color = '#dc3545';
-        }
-      });
-    }
     
     if (stopCameraBtn) {
       stopCameraBtn.addEventListener('click', () => {
@@ -2302,7 +2271,6 @@ function initializeWebSocket() {
           adminVideoElement.srcObject = null;
         }
         
-        startCameraBtn.style.display = 'inline-block';
         stopCameraBtn.style.display = 'none';
         statusElement.textContent = 'Offline';
         statusElement.style.color = '#6c757d';
@@ -2363,45 +2331,123 @@ function initializeWebSocket() {
   }
 
 
+  // Video stabilization variables
+  let lastVideoUpdate = 0;
+  let videoUpdateInterval = 150; // Minimum 150ms between updates (6.7 FPS max)
+  let lastValidFrame = null;
+  let frameSkipCount = 0;
+  const maxFrameSkip = 3; // Skip up to 3 small frames before showing one
+  let lastCameraType = null; // Track camera type changes
+
+  function resetVideoState() {
+    console.log('🎥 Resetting video state for new room/camera');
+    lastVideoUpdate = 0;
+    lastValidFrame = null;
+    frameSkipCount = 0;
+    lastCameraType = null; // Reset camera type tracking
+    
+    // Clear the video element
+    const imgEl = document.getElementById('client-video');
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.style.display = 'none';
+    }
+    
+    // Reset status indicators
+    const statusEl = document.getElementById('client-status');
+    const cameraIndicator = document.getElementById('clientCameraIndicator');
+    if (statusEl) statusEl.textContent = 'Switching...';
+    if (cameraIndicator) cameraIndicator.textContent = 'Switching...';
+    
+    // Add a small delay to allow the new camera to initialize
+    setTimeout(() => {
+      if (statusEl) statusEl.textContent = 'Connecting...';
+    }, 500);
+  }
+
   function updateVideoStream(camera, imageData) {
     console.log('🎥 Admin received video:', camera, imageData ? imageData.length : 0, 'bytes');
     
-    // Cerca l'elemento immagine corretto
-    let imgEl = document.getElementById('video-back');
-    if (!imgEl) {
-      imgEl = document.getElementById('admin-video');
+    // Check if camera type has changed
+    if (lastCameraType && lastCameraType !== camera) {
+      console.log('🎥 Camera type changed from', lastCameraType, 'to', camera, '- resetting video state');
+      resetVideoState();
     }
+    lastCameraType = camera;
     
-    const statusEl = document.getElementById('status-back');
-    const cameraIndicator = document.getElementById('cameraIndicator');
+    // Usa solo il video del client
+    const imgEl = document.getElementById('client-video');
+    const statusEl = document.getElementById('client-status');
+    const cameraIndicator = document.getElementById('clientCameraIndicator');
     
-    if (imgEl && imageData) {
-      console.log('🎥 Updating image element with image data');
-      console.log('🎥 Image element details:', {
-        tagName: imgEl.tagName,
-        id: imgEl.id,
-        src: imgEl.src ? imgEl.src.substring(0, 50) + '...' : 'no src',
-        width: imgEl.width,
-        height: imgEl.height,
-        style: imgEl.style.cssText
-      });
-      
-      imgEl.src = imageData;
-      imgEl.style.display = 'block';
-      imgEl.style.visibility = 'visible';
-      
-      if (statusEl) statusEl.textContent = 'Live';
-      if (cameraIndicator) {
-        cameraIndicator.textContent = camera === 'front' ? 'Frontale' : 'Posteriore';
-      }
-      
-      console.log('🎥 Image updated successfully');
-    } else {
+    if (!imgEl || !imageData) {
       console.log('🎥 Image element not found or no image data:', {
         imgEl: !!imgEl,
         imageData: !!imageData
       });
+      return;
     }
+
+    // Video stabilization logic
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastVideoUpdate;
+    
+    // Check if this is a small/empty frame (likely corrupted or placeholder)
+    const isSmallFrame = imageData.length < 3000; // Less than 3KB is likely a small frame
+    
+    // If it's a small frame, skip it unless we've skipped too many
+    if (isSmallFrame) {
+      frameSkipCount++;
+      if (frameSkipCount < maxFrameSkip) {
+        console.log('🎥 Skipping small frame:', imageData.length, 'bytes (skip count:', frameSkipCount, ')');
+        return;
+      }
+    } else {
+      // Reset skip count for valid frames
+      frameSkipCount = 0;
+    }
+    
+    // Rate limiting - don't update too frequently
+    if (timeSinceLastUpdate < videoUpdateInterval) {
+      console.log('🎥 Rate limiting - skipping frame (too fast)');
+      return;
+    }
+    
+    // Additional stability check - ensure we have a reasonable frame size
+    if (imageData.length < 1000) {
+      console.log('🎥 Frame too small, likely corrupted:', imageData.length, 'bytes');
+      return;
+    }
+    
+    // Store the last valid frame as backup
+    if (!isSmallFrame) {
+      lastValidFrame = imageData;
+    }
+    
+    console.log('🎥 Updating image element with image data');
+    console.log('🎥 Image element details:', {
+      tagName: imgEl.tagName,
+      id: imgEl.id,
+      src: imgEl.src ? imgEl.src.substring(0, 50) + '...' : 'no src',
+      width: imgEl.width,
+      height: imgEl.height,
+      style: imgEl.style.cssText
+    });
+    
+    // Use the current frame or fallback to last valid frame
+    const frameToUse = isSmallFrame && lastValidFrame ? lastValidFrame : imageData;
+    
+    imgEl.src = frameToUse;
+    imgEl.style.display = 'block';
+    imgEl.style.visibility = 'visible';
+    
+    if (statusEl) statusEl.textContent = 'Live';
+    if (cameraIndicator) {
+      cameraIndicator.textContent = camera === 'front' ? 'Frontale' : 'Posteriore';
+    }
+    
+    lastVideoUpdate = now;
+    console.log('🎥 Image updated successfully');
   }
 
 
@@ -2411,7 +2457,7 @@ function initializeWebSocket() {
   function updateAudioStream(audioData, sampleRate) {
     console.log('🎵 Admin received audio:', audioData ? audioData.length : 0, 'bytes, sampleRate:', sampleRate);
     
-    const audioIndicator = document.getElementById('audioIndicator');
+    const audioIndicator = document.getElementById('clientAudioIndicator');
     if (audioIndicator) {
       audioIndicator.style.display = 'flex';
       
@@ -2595,6 +2641,19 @@ function initializeWebSocket() {
       
       console.log('🎥 Switching to front camera');
       
+      // Reset video stabilization state when switching cameras
+      resetVideoState();
+      
+      // Send camera control command to client
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'cameraControl',
+          targetRoom: selectedRoom,
+          camera: 'front'
+        }));
+        console.log('📤 Sent front camera command to client');
+      }
+      
       // If camera is already running, restart with new camera
       if (adminVideoStream) {
         adminVideoStream.getTracks().forEach(track => track.stop());
@@ -2634,6 +2693,19 @@ function initializeWebSocket() {
       frontCameraBtn.classList.remove('active');
       
       console.log('🎥 Switching to back camera');
+      
+      // Reset video stabilization state when switching cameras
+      resetVideoState();
+      
+      // Send camera control command to client
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'cameraControl',
+          targetRoom: selectedRoom,
+          camera: 'back'
+        }));
+        console.log('📤 Sent back camera command to client');
+      }
       
       // If camera is already running, restart with new camera
       if (adminVideoStream) {
