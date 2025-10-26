@@ -675,6 +675,10 @@ function handleAdminLogin() {
   }
   
   if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    // Save login state to localStorage
+    localStorage.setItem('adminLoggedIn', 'true');
+    localStorage.setItem('adminLoginTime', Date.now().toString());
+    
     // Login successful
     adminLoginContainer.style.display = 'none';
     adminDashboard.style.display = 'flex';
@@ -700,6 +704,10 @@ function showLoginError(message) {
 }
 
 function handleLogout() {
+  // Clear login state from localStorage
+  localStorage.removeItem('adminLoggedIn');
+  localStorage.removeItem('adminLoginTime');
+  
   if (ws) {
     ws.close();
   }
@@ -708,6 +716,40 @@ function handleLogout() {
   adminUsername.value = '';
   adminPassword.value = '';
   adminUsername.focus();
+}
+
+function checkAdminSession() {
+  const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+  const loginTime = localStorage.getItem('adminLoginTime');
+  
+  if (isLoggedIn && loginTime) {
+    // Check if session is not older than 24 hours
+    const sessionAge = Date.now() - parseInt(loginTime);
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    
+    if (sessionAge < maxAge) {
+      // Session is valid, auto-login
+      adminLoginContainer.style.display = 'none';
+      adminDashboard.style.display = 'flex';
+      initializeWebSocket();
+      
+      // Restore selected room if exists
+      const savedRoom = localStorage.getItem('adminSelectedRoom');
+      if (savedRoom) {
+        setTimeout(() => {
+          selectRoom(savedRoom);
+        }, 1000); // Wait for WebSocket to be ready
+      }
+      
+      return true;
+    } else {
+      // Session expired, clear it
+      localStorage.removeItem('adminLoggedIn');
+      localStorage.removeItem('adminLoginTime');
+    }
+  }
+  
+  return false;
 }
 
 function initializeWebSocket() {
@@ -792,6 +834,9 @@ function initializeWebSocket() {
 
   function selectRoom(room) {
     selectedRoom = room;
+    
+    // Save selected room to localStorage
+    localStorage.setItem('adminSelectedRoom', room);
     
     // Update UI
     document.querySelectorAll('.room-item').forEach(item => {
@@ -1086,8 +1131,11 @@ function initializeWebSocket() {
   logoutBtn.addEventListener('click', handleLogout);
 }
 
-// Initialize admin login on page load
-initializeAdminLogin();
+  // Check for existing session first
+  if (!checkAdminSession()) {
+    // No valid session, show login
+    initializeAdminLogin();
+  }
 </script>
 </body>
 </html>
