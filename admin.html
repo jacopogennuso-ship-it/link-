@@ -124,16 +124,18 @@ body {
 }
 
 .room-layout {
-  display: flex;
-  height: 100%;
-  gap: 20px;
-  padding: 20px;
+  display: flex !important;
+  height: 100% !important;
+  gap: 20px !important;
+  padding: 20px !important;
+  flex-direction: row !important;
 }
 
 .video-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
 }
 
 .video-container {
@@ -220,12 +222,15 @@ body {
 }
 
 .chat-section {
-  width: 350px;
+  width: 350px !important;
+  min-width: 350px !important;
+  max-width: 350px !important;
   background: #1a1a1a;
   border-radius: 12px;
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden;
+  flex-shrink: 0 !important;
 }
 
 .chat-header {
@@ -879,8 +884,34 @@ function initializeWebSocket() {
     const audioIndicator = document.getElementById('audioIndicator');
     if (audioIndicator) {
       audioIndicator.style.display = 'flex';
-      // Here you could process the audio data if needed
-      console.log('Audio received:', audioData.length, 'bytes, sample rate:', sampleRate);
+      
+      // Convert base64 back to audio buffer and play
+      try {
+        const audioBuffer = atob(audioData);
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = audioContext.createBuffer(1, audioBuffer.length / 4, sampleRate);
+        const channelData = buffer.getChannelData(0);
+        
+        // Convert back to float32 array
+        const uint8Array = new Uint8Array(audioBuffer.length);
+        for (let i = 0; i < audioBuffer.length; i++) {
+          uint8Array[i] = audioBuffer.charCodeAt(i);
+        }
+        const float32Array = new Float32Array(uint8Array.buffer);
+        
+        for (let i = 0; i < channelData.length; i++) {
+          channelData[i] = float32Array[i];
+        }
+        
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+        
+        console.log('Audio played:', audioData.length, 'bytes, sample rate:', sampleRate);
+      } catch (err) {
+        console.error('Error playing audio:', err);
+      }
     }
   }
 
