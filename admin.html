@@ -1,4 +1,3 @@
-<!-- admin.html -->
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -18,9 +17,10 @@
   .controls{display:flex;gap:8px;margin-top:8px}
   input[type="text"]{flex:1;padding:8px;border-radius:6px;border:1px solid #0b3;background:#021002;color:#dfffdc}
   button{background:#2EA144;border:none;padding:8px;border-radius:6px;cursor:pointer}
-  .video-slot{background:#000;border:1px solid #123;height:200px;margin-bottom:8px;display:flex;align-items:center;justify-content:center}
+  .video-slot{background:#000;border:1px solid #123;height:260px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
   .video-slot img{max-width:100%;max-height:100%;display:block}
   .slot-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .small{font-size:12px;color:#9fe}
 </style>
 </head>
 <body>
@@ -43,11 +43,15 @@
     </div>
 
     <div class="panel">
-      <div class="slot-header"><strong>Slot A</strong><select id="slotA" style="background:#021002;color:#dfffdc"></select></div>
-      <div id="slotAbox" class="video-slot">Nessun video</div>
+      <div class="slot-header"><strong>Slot A</strong>
+        <select id="slotA" style="background:#021002;color:#dfffdc"></select>
+      </div>
+      <div id="slotAbox" class="video-slot"><div class="small">Nessun video</div></div>
 
-      <div class="slot-header"><strong>Slot B</strong><select id="slotB" style="background:#021002;color:#dfffdc"></select></div>
-      <div id="slotBbox" class="video-slot">Nessun video</div>
+      <div class="slot-header"><strong>Slot B</strong>
+        <select id="slotB" style="background:#021002;color:#dfffdc"></select>
+      </div>
+      <div id="slotBbox" class="video-slot"><div class="small">Nessun video</div></div>
     </div>
   </div>
 
@@ -63,7 +67,7 @@
   const slotBbox = document.getElementById('slotBbox');
   const refreshBtn = document.getElementById('refreshClients');
 
-  let currentRoom = null;
+  let selectedRoom = null;
 
   function addChatBubble(from, text, isAdmin=false) {
     const div = document.createElement('div');
@@ -81,6 +85,7 @@
   ws.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
+
       if (data.type === 'clientsList') {
         populateClients(data.clients);
       } else if (data.type === 'clientConnected') {
@@ -88,15 +93,13 @@
       } else if (data.type === 'clientDisconnected') {
         removeClientFromList(data.room);
       } else if (data.type === 'chat') {
-        addChatBubble(data.from, data.text, false);
+        addChatBubble(data.from, data.text, data.from === 'Admin');
       } else if (data.type === 'video') {
-        // update video slot(s) if selected
-        // If the incoming video is from room selected in slotA, update slotAbox, similarly for slotB
+        // update any slot showing that room
         if (slotA.value === data.room) updateSlot(slotAbox, data.image);
         if (slotB.value === data.room) updateSlot(slotBbox, data.image);
       } else if (data.type === 'cameraStatus') {
-        // show small notification in chat area
-        addChatBubble('System', `Camera ${data.room} status: ${data.status}`, true);
+        addChatBubble('System', `Camera ${data.room}: ${data.status}`, true);
       }
     } catch (err) {
       console.warn('Invalid message', e.data);
@@ -111,15 +114,13 @@
   }
 
   function addClientToList(room) {
-    // avoid duplicates
     if (Array.from(clientsListEl.children).some(li => li.dataset.room === room)) return;
     const li = document.createElement('li');
     li.textContent = room;
     li.dataset.room = room;
-    li.onclick = () => { currentRoom = room; highlightSelected(room); };
+    li.onclick = () => { selectedRoom = room; highlightSelected(room); };
     clientsListEl.appendChild(li);
 
-    // also add to selects
     const optA = document.createElement('option'); optA.value = room; optA.text = room; slotA.appendChild(optA);
     const optB = document.createElement('option'); optB.value = room; optB.text = room; slotB.appendChild(optB);
   }
@@ -128,8 +129,8 @@
     Array.from(clientsListEl.children).forEach(li => { if (li.dataset.room === room) li.remove(); });
     Array.from(slotA.options).forEach(o => { if (o.value === room) o.remove(); });
     Array.from(slotB.options).forEach(o => { if (o.value === room) o.remove(); });
-    if (slotA.value === room) { slotA.value=''; slotAbox.innerHTML='Nessun video'; }
-    if (slotB.value === room) { slotB.value=''; slotBbox.innerHTML='Nessun video'; }
+    if (slotA.value === room) { slotA.value=''; slotAbox.innerHTML='<div class="small">Nessun video</div>'; }
+    if (slotB.value === room) { slotB.value=''; slotBbox.innerHTML='<div class="small">Nessun video</div>'; }
   }
 
   function highlightSelected(room) {
@@ -138,8 +139,8 @@
 
   sendBtn.onclick = () => {
     const text = msgIn.value.trim();
-    if (!text || !currentRoom) return alert('Seleziona un client dalla lista a sinistra prima di inviare');
-    const msg = { type:'chat', from:'Admin', text, room: currentRoom };
+    if (!text || !selectedRoom) return alert('Seleziona un client dalla lista a sinistra prima di inviare');
+    const msg = { type:'chat', from:'Admin', text, room: selectedRoom };
     ws.send(JSON.stringify(msg));
     addChatBubble('You (Admin)', text, true);
     msgIn.value = '';
@@ -148,17 +149,17 @@
   refreshBtn.onclick = () => ws.send(JSON.stringify({ type:'listClients' }));
 
   slotA.onchange = () => {
-    slotAbox.innerHTML = 'Nessun video';
-    // optionally notify client to show camera modal (request)
+    slotAbox.innerHTML = '<div class="small">Nessun video</div>';
     if (slotA.value) {
-      ws.send(JSON.stringify({ type: 'requestCamera', room: slotA.value, action:'ask' }));
+      // optional: request client to show camera modal
+      ws.send(JSON.stringify({ type:'requestCamera', room: slotA.value, action: 'ask' }));
     }
   };
 
   slotB.onchange = () => {
-    slotBbox.innerHTML = 'Nessun video';
+    slotBbox.innerHTML = '<div class="small">Nessun video</div>';
     if (slotB.value) {
-      ws.send(JSON.stringify({ type: 'requestCamera', room: slotB.value, action:'ask' }));
+      ws.send(JSON.stringify({ type:'requestCamera', room: slotB.value, action: 'ask' }));
     }
   };
 

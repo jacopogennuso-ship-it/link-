@@ -16,7 +16,7 @@ const server = app.listen(PORT, () => {
   console.log(`Server avviato su http://localhost:${PORT}`);
 });
 
-// WebSocket server (single endpoint /ws)
+// WebSocket endpoint: /ws
 const wss = new ws.Server({ noServer: true });
 
 // Keep track of clients and admins
@@ -34,6 +34,13 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
+function broadcastAdmins(obj) {
+  const raw = JSON.stringify(obj);
+  admins.forEach(a => {
+    if (a.readyState === ws.OPEN) a.send(raw);
+  });
+}
+
 wss.on('connection', (socket, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const role = url.searchParams.get('role') || 'client';
@@ -43,70 +50,62 @@ wss.on('connection', (socket, req) => {
 
   if (role === 'admin') {
     admins.add(socket);
-    // send current clients list
-    const list = Array.from(clients.keys());
-    socket.send(JSON.stringify({ type: 'clientsList', clients: list }));
+    // send full clients list + their last known cameraStatus (we only store rooms; status is ephemeral)
+    socket.send(JSON.stringify({ type: 'clientsList', clients: Array.from(clients.keys()) }));
   } else {
     clients.set(room, socket);
-    // notify admins of new client
-    const msg = JSON.stringify({ type: 'clientConnected', room });
-    admins.forEach(a => { if (a.readyState === ws.OPEN) a.send(msg); });
+    // notify admins a client connected
+    broadcastAdmins({ type: 'clientConnected', room });
   }
 
-  // Handle messages
   socket.on('message', (raw) => {
-    // Messages are JSON strings (except -- we won't accept binary here)
     let data;
     try {
       data = JSON.parse(raw);
     } catch (e) {
-      console.warn('Invalid message', raw);
+      console.warn('Non-JSON message ignored');
       return;
     }
 
-    // Chat messages (bidirectional)
+    // Chat messages (text)
     if (data.type === 'chat') {
-      // data: { type:'chat', from:'Utente'|'Admin', text:'...', room: 'room' }
+      // if from admin -> forward to client
       if (data.from === 'Admin') {
-        // forward to client
         const target = clients.get(data.room);
         if (target && target.readyState === ws.OPEN) target.send(JSON.stringify(data));
       } else {
         // from client -> forward to all admins
-        admins.forEach(a => { if (a.readyState === ws.OPEN) a.send(JSON.stringify(data)); });
+        broadcastAdmins(data);
       }
+      return;
     }
 
-    // Video frames from client => forward to all admins
-    else if (data.type === 'video') {
-      // data: { type:'video', room:'room', image:'data:image/jpeg;base64,...' }
-      admins.forEach(a => {
-        if (a.readyState === ws.OPEN) {
-          a.send(JSON.stringify({ type: 'video', room: data.room, image: data.image }));
-        }
-      });
+    // Video frame from client -> forward to admins
+    if (data.type === 'video' && data.room && data.image) {
+      broadcastAdmins({ type: 'video', room: data.room, image: data.image });
+      return;
     }
 
-    // Camera consent / status messages
-    else if (data.type === 'cameraStatus') {
-      // data: { type:'cameraStatus', room:'room', status: 'accepted'|'declined'|'stopped' }
-      admins.forEach(a => { if (a.readyState === ws.OPEN) a.send(JSON.stringify(data)); });
+    // Camera status (accepted/declined/stopped) from client -> notify admins
+    if (data.type === 'cameraStatus' && data.room && data.status) {
+      broadcastAdmins({ type: 'cameraStatus', room: data.room, status: data.status });
+      return;
     }
 
     // Admin requests list of clients
-    else if (data.type === 'listClients') {
-      const list = Array.from(clients.keys());
-      socket.send(JSON.stringify({ type: 'clientsList', clients: list }));
+    if (data.type === 'listClients') {
+      socket.send(JSON.stringify({ type: 'clientsList', clients: Array.from(clients.keys()) }));
+      return;
     }
 
-    // Admin can request to ask client to start/stop camera (this is optional)
-    else if (data.type === 'requestCamera') {
-      // data: { type:'requestCamera', room:'room', action:'ask' } -> forwarded to client as an informational request
+    // Admin requests client to show consent modal (optional)
+    if (data.type === 'requestCamera' && data.room) {
       const target = clients.get(data.room);
-      if (target && target.readyState === ws.OPEN) target.send(JSON.stringify({ type: 'requestCamera', action: data.action }));
+      if (target && target.readyState === ws.OPEN) {
+        target.send(JSON.stringify({ type: 'requestCamera', action: data.action || 'ask' }));
+      }
+      return;
     }
-
-    // any other message types can be added as needed
   });
 
   socket.on('close', () => {
@@ -114,14 +113,14 @@ wss.on('connection', (socket, req) => {
       admins.delete(socket);
     } else {
       clients.delete(room);
-      // notify admins
-      const msg = JSON.stringify({ type: 'clientDisconnected', room });
-      admins.forEach(a => { if (a.readyState === ws.OPEN) a.send(msg); });
+      broadcastAdmins({ type: 'clientDisconnected', room });
     }
     console.log(`Disconnessione: role=${role}, room=${room}`);
   });
 
   socket.on('error', (err) => {
-    console.error('WS error', err && err.message);
+    console.error('WS error:', err && err.message);
   });
 });
+
+
