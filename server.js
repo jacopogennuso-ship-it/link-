@@ -121,15 +121,25 @@ wss.on('connection', (ws, req)=>{
   if(role==='client' && room) {
     clients.set(room, ws);
     rooms.add(room);
+    console.log(`📱 Client connected to room: ${room}`);
+    console.log(`📊 Total rooms: ${rooms.size}, Total clients: ${clients.size}`);
+    
     // Notify admins about new client
     admins.forEach(a=>{
-      if(a.readyState===ws.OPEN) a.send(JSON.stringify({ type:'clientConnected', room }));
+      if(a.readyState===ws.OPEN) {
+        a.send(JSON.stringify({ type:'clientConnected', room }));
+        console.log(`📤 Notified admin about client connection: ${room}`);
+      }
     });
   }
   if(role==='admin') {
     admins.add(ws);
+    console.log(`👨‍💼 Admin connected. Total admins: ${admins.size}`);
+    console.log(`📊 Available rooms: ${Array.from(rooms)}`);
+    
     // Send list of available rooms to new admin
     ws.send(JSON.stringify({ type:'roomsList', rooms: Array.from(rooms) }));
+    console.log(`📤 Sent rooms list to admin: ${Array.from(rooms)}`);
   }
 
   ws.on('message', msg=>{
@@ -184,7 +194,15 @@ wss.on('connection', (ws, req)=>{
                 badge: '/icons/icon-72x72.svg'
               }));
               
-              console.log(`Push notification sent to room ${targetRoom}: ${message.text}`);
+              // Also send a visual notification for in-app display
+              c.send(JSON.stringify({
+                type: 'visualNotification',
+                title: 'Nuovo messaggio da Admin',
+                body: message.text,
+                timestamp: Date.now()
+              }));
+              
+              console.log(`📤 Push notification sent to room ${targetRoom}: ${message.text}`);
             }
           }
         }
@@ -262,13 +280,25 @@ wss.on('connection', (ws, req)=>{
   });
 
   ws.on('close', ()=>{
+    console.log(`❌ WebSocket disconnected: ${ws.role} ${room || 'admin'}`);
+    
     if(ws.role==='client' && room){
       clients.delete(room);
       rooms.delete(room);
+      console.log(`📱 Client disconnected from room: ${room}`);
+      console.log(`📊 Remaining rooms: ${rooms.size}, Remaining clients: ${clients.size}`);
+      
+      // Notify admins about client disconnection
       admins.forEach(a=>{
-        if(a.readyState===ws.OPEN) a.send(JSON.stringify({ type:'clientDisconnected', room }));
+        if(a.readyState===ws.OPEN) {
+          a.send(JSON.stringify({ type:'clientDisconnected', room }));
+          console.log(`📤 Notified admin about client disconnection: ${room}`);
+        }
       });
     }
-    if(ws.role==='admin') admins.delete(ws);
+    if(ws.role==='admin') {
+      admins.delete(ws);
+      console.log(`👨‍💼 Admin disconnected. Remaining admins: ${admins.size}`);
+    }
   });
 });

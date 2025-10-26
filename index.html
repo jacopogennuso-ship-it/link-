@@ -614,6 +614,74 @@ function stopHeartbeat() {
   }
 }
 
+// In-app notification system
+function showInAppNotification(title, body) {
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #25d366;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 10000;
+    max-width: 90%;
+    text-align: center;
+    font-size: 14px;
+    animation: slideDown 0.3s ease-out;
+  `;
+  
+  notification.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+    <div>${body}</div>
+  `;
+  
+  // Add animation keyframes
+  if (!document.getElementById('notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'notification-styles';
+    style.textContent = `
+      @keyframes slideDown {
+        from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+        to { transform: translateX(-50%) translateY(0); opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { transform: translateX(-50%) translateY(0); opacity: 1; }
+        to { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(notification);
+  
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideUp 0.3s ease-in';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 5000);
+  
+  // Click to dismiss
+  notification.addEventListener('click', () => {
+    notification.style.animation = 'slideUp 0.3s ease-in';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  });
+  
+  console.log('📱 In-app notification shown:', title, body);
+}
+
 function setupChatFunctionality() {
   // Connection status is now handled in connectWebSocket()
 
@@ -626,6 +694,11 @@ function setupChatFunctionality() {
       if (data.type === 'chat') {
         console.log('Adding message from:', data.from, 'text:', data.text);
         addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+        
+        // Show visual notification for new messages
+        if (document.hidden || !document.hasFocus()) {
+          showInAppNotification('Nuovo messaggio', `${data.from}: ${data.text}`);
+        }
       }
       
       if (data.type === 'pushNotification') {
@@ -657,6 +730,9 @@ function setupChatFunctionality() {
           console.log('Browser notification shown');
         } else {
           console.log('Notification permission not granted:', Notification.permission);
+          // Show in-app notification as fallback
+          showInAppNotification(data.title, data.body);
+          
           // Request permission again
           Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
@@ -664,6 +740,12 @@ function setupChatFunctionality() {
             }
           });
         }
+      }
+      
+      if (data.type === 'visualNotification') {
+        console.log('Visual notification received:', data);
+        // Always show in-app notification for visual feedback
+        showInAppNotification(data.title, data.body);
       }
       
       if (data.type === 'cameraControl') {
