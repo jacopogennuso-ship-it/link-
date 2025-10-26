@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin Chat + Video</title>
 <style>
-body{margin:0;font-family:Segoe UI,Roboto,Arial;background:#0b0b0b;color:#dfffdc}
+body{margin:0;font-family:Segoe UI,Arial;background:#0b0b0b;color:#dfffdc}
 header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#021002;color:#2EA144}
 h1{margin:0;font-size:18px}
 .container{display:flex;flex-wrap:wrap;gap:12px;padding:12px}
 .video-container{flex:1 1 45%;background:#011001;padding:6px;border-radius:8px;display:flex;flex-direction:column;align-items:center}
-.video-container video{width:100%;border-radius:6px;background:#000}
+.video-container img{width:100%;border-radius:6px;background:#000}
 .video-container h2{margin:6px 0 4px 0;font-size:14px;color:#2EA144}
-.video-container .status{font-size:11px;color:#9fe;text-align:center;margin-bottom:4px}
+.video-container .status{font-size:11px;color:#9fe;margin-bottom:4px;text-align:center}
 .chat-container{flex:1 1 100%;display:flex;flex-direction:column;background:#011001;border-radius:8px;height:400px;overflow:hidden;margin-top:12px}
 #chat{flex:1;overflow:auto;padding:8px}
 .row{display:flex;margin:6px 0}
@@ -34,12 +34,12 @@ h1{margin:0;font-size:18px}
 <div class="container">
   <div class="video-container">
     <h2>Camera Posteriore</h2>
-    <video id="video-back" autoplay muted playsinline></video>
+    <img id="video-back"/>
     <div class="status" id="status-back">Offline</div>
   </div>
   <div class="video-container">
     <h2>Camera Frontale</h2>
-    <video id="video-front" autoplay muted playsinline></video>
+    <img id="video-front"/>
     <div class="status" id="status-front">Offline</div>
   </div>
 </div>
@@ -54,14 +54,14 @@ h1{margin:0;font-size:18px}
 
 <script>
 const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=admin`);
-const chatEl = document.getElementById('chat');
-const textIn = document.getElementById('text');
-const sendBtn = document.getElementById('sendBtn');
-const statusEl = document.getElementById('status');
-const videoBack = document.getElementById('video-back');
-const videoFront = document.getElementById('video-front');
-const statusBack = document.getElementById('status-back');
-const statusFront = document.getElementById('status-front');
+const chatEl=document.getElementById('chat');
+const textIn=document.getElementById('text');
+const sendBtn=document.getElementById('sendBtn');
+const statusEl=document.getElementById('status');
+const videoBack=document.getElementById('video-back');
+const videoFront=document.getElementById('video-front');
+const statusBack=document.getElementById('status-back');
+const statusFront=document.getElementById('status-front');
 
 function addMessage(from,text,me=false){
   const row=document.createElement('div');
@@ -76,32 +76,14 @@ function addMessage(from,text,me=false){
 
 ws.addEventListener('open',()=>statusEl.textContent='Connesso');
 ws.addEventListener('close',()=>statusEl.textContent='Disconnesso');
+
 ws.addEventListener('message',e=>{
   try{
     const data=JSON.parse(e.data);
     if(data.type==='chat') addMessage(data.from,data.text,false);
-    else if(data.type==='video'){
-      const img=new Image();
-      img.src=data.image;
-      img.onload=()=>{
-        if(data.cam==='back'){
-          const ctx=document.createElement('canvas').getContext('2d');
-          ctx.canvas.width=videoBack.videoWidth||320;
-          ctx.canvas.height=videoBack.videoHeight||240;
-          ctx.drawImage(img,0,0,ctx.canvas.width,ctx.canvas.height);
-          videoBack.srcObject=null;
-          videoBack.src=ctx.canvas.toDataURL('image/jpeg');
-          statusBack.textContent='Live';
-        } else if(data.cam==='front'){
-          const ctx=document.createElement('canvas').getContext('2d');
-          ctx.canvas.width=videoFront.videoWidth||320;
-          ctx.canvas.height=videoFront.videoHeight||240;
-          ctx.drawImage(img,0,0,ctx.canvas.width,ctx.canvas.height);
-          videoFront.srcObject=null;
-          videoFront.src=ctx.canvas.toDataURL('image/jpeg');
-          statusFront.textContent='Live';
-        }
-      }
+    if(data.type==='video'){
+      if(data.cam==='back'){ videoBack.src=data.image; statusBack.textContent='Live'; }
+      if(data.cam==='front'){ videoFront.src=data.image; statusFront.textContent='Live'; }
     }
   }catch(err){console.error(err);}
 });
@@ -109,8 +91,7 @@ ws.addEventListener('message',e=>{
 sendBtn.onclick=()=>{
   const text=textIn.value.trim();
   if(!text) return;
-  const msg={type:'chat',from:'Admin',text};
-  ws.send(JSON.stringify(msg));
+  ws.send(JSON.stringify({type:'chat',text}));
   addMessage('Tu',text,true);
   textIn.value='';
 };

