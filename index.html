@@ -428,6 +428,8 @@ let reconnectAttempts = 0;
 let maxReconnectAttempts = 10;
 let reconnectInterval = 3000; // 3 seconds
 let isReconnecting = false;
+let heartbeatInterval = null;
+let lastHeartbeat = Date.now();
 
 // Login elements
 const loginContainer = document.getElementById('loginContainer');
@@ -499,6 +501,12 @@ function connectWebSocket() {
   if (isReconnecting) return;
   
   console.log(`Connecting to WebSocket... (attempt ${reconnectAttempts + 1})`);
+  
+  // Close existing connection if any
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.close();
+  }
+  
   ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
   
   ws.addEventListener('open', () => {
@@ -519,10 +527,20 @@ function connectWebSocket() {
       console.log('🔄 Restarting camera after reconnection');
       startCamera();
     }
+    
+    // Send room selection to server
+    ws.send(JSON.stringify({ type: 'selectRoom', room: room }));
+    
+    // Start heartbeat to keep connection alive in PWA
+    startHeartbeat();
   });
   
   ws.addEventListener('close', (event) => {
     console.log('❌ WebSocket disconnected:', event.code, event.reason);
+    
+    // Stop heartbeat
+    stopHeartbeat();
+    
     if (connectionStatus) {
       connectionStatus.textContent = 'Disconnesso';
       connectionStatus.style.color = '#ff4444';
@@ -570,6 +588,32 @@ function connectWebSocket() {
   });
 }
 
+// Heartbeat functions for PWA connection stability
+function startHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+  
+  heartbeatInterval = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      lastHeartbeat = Date.now();
+      ws.send(JSON.stringify({ type: 'ping', timestamp: lastHeartbeat }));
+      console.log('💓 Heartbeat sent');
+    } else {
+      console.log('💔 Heartbeat failed - WebSocket not open');
+      stopHeartbeat();
+    }
+  }, 30000); // Send heartbeat every 30 seconds
+}
+
+function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    console.log('💔 Heartbeat stopped');
+  }
+}
+
 function setupChatFunctionality() {
   // Connection status is now handled in connectWebSocket()
 
@@ -591,10 +635,12 @@ function setupChatFunctionality() {
         if (Notification.permission === 'granted') {
           const notification = new Notification(data.title, {
             body: data.body,
-            icon: data.icon,
+            icon: data.icon || '/icons/icon-192x192.svg',
             badge: '/icons/icon-72x72.svg',
             tag: 'jacopo-chat',
-            requireInteraction: true
+            requireInteraction: true,
+            silent: false,
+            vibrate: [200, 100, 200]
           });
           
           // Handle notification click
@@ -603,9 +649,20 @@ function setupChatFunctionality() {
             notification.close();
           };
           
+          // Auto-close after 5 seconds
+          setTimeout(() => {
+            notification.close();
+          }, 5000);
+          
           console.log('Browser notification shown');
         } else {
           console.log('Notification permission not granted:', Notification.permission);
+          // Request permission again
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              console.log('✅ Notifications enabled after request');
+            }
+          });
         }
       }
       
@@ -615,6 +672,11 @@ function setupChatFunctionality() {
           currentCamera = data.camera;
           startCamera();
         }
+      }
+      
+      if (data.type === 'pong') {
+        console.log('💓 Pong received from server');
+        lastHeartbeat = Date.now();
       }
     } catch (err) {
       console.error('Error processing message:', err);
@@ -906,6 +968,46 @@ if ('Notification' in window) {
   console.log('❌ Notifications not supported');
 }
 
+// Handle visibility change for better notification handling
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    console.log('App is now in background');
+    // Don't disconnect WebSocket in PWA mode
+    if (!window.matchMedia('(display-mode: standalone)').matches) {
+      console.log('Not in PWA mode, keeping connection alive');
+    }
+  } else {
+    console.log('App is now in foreground');
+    // Check if WebSocket is still connected when coming back to foreground
+    if (ws && ws.readyState !== WebSocket.OPEN) {
+      console.log('🔄 WebSocket disconnected while in background, reconnecting...');
+      reconnectAttempts = 0;
+      isReconnecting = false;
+      connectWebSocket();
+    }
+  }
+});
+
+// Handle page focus/blur for notification management
+window.addEventListener('focus', () => {
+  console.log('Window focused');
+  // Check WebSocket connection when window gains focus
+  if (ws && ws.readyState !== WebSocket.OPEN) {
+    console.log('🔄 WebSocket disconnected, reconnecting...');
+    reconnectAttempts = 0;
+    isReconnecting = false;
+    connectWebSocket();
+  }
+});
+
+window.addEventListener('blur', () => {
+  console.log('Window blurred');
+  // Keep connection alive in PWA mode
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    console.log('PWA mode: keeping connection alive in background');
+  }
+});
+
 // PWA Install prompt
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -913,8 +1015,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   
-  // Show install button
-  showInstallButton();
+  // Only show install button if app is not already installed
+  if (!isAppInstalled()) {
+    showInstallButton();
+  } else {
+    console.log('App already installed, skipping install prompt');
+  }
 });
 
 function showInstallButton() {
@@ -942,6 +1048,16 @@ function showInstallButton() {
       console.log('PWA install outcome:', outcome);
       deferredPrompt = null;
       installBtn.remove();
+      
+      // If installed, hide any other install buttons
+      if (outcome === 'accepted') {
+        const otherButtons = document.querySelectorAll('button[style*="position: fixed"]');
+        otherButtons.forEach(btn => {
+          if (btn.innerHTML.includes('Installa')) {
+            btn.remove();
+          }
+        });
+      }
     }
   });
   
@@ -955,8 +1071,34 @@ function showInstallButton() {
   }, 10000);
 }
 
+// Check if app is already installed
+function isAppInstalled() {
+  // Check if running in standalone mode (PWA)
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return true;
+  }
+  
+  // Check if running in fullscreen mode
+  if (window.navigator.standalone === true) {
+    return true;
+  }
+  
+  // Check if running in app mode (iOS)
+  if (window.navigator.userAgent.includes('Mobile') && window.navigator.standalone) {
+    return true;
+  }
+  
+  return false;
+}
+
 // Manual install button for macOS
 function addManualInstallButton() {
+  // Don't show install button if app is already installed
+  if (isAppInstalled()) {
+    console.log('App already installed, skipping install button');
+    return;
+  }
+  
   const installBtn = document.createElement('button');
   installBtn.innerHTML = '📱 Installa App';
   installBtn.style.cssText = `
@@ -1003,12 +1145,51 @@ if (!checkClientSession()) {
 // Add manual install button after 3 seconds
 setTimeout(addManualInstallButton, 3000);
 
+// Listen for app installation
+window.addEventListener('appinstalled', () => {
+  console.log('✅ PWA app installed');
+  // Hide any install buttons
+  const installButtons = document.querySelectorAll('button[style*="position: fixed"]');
+  installButtons.forEach(btn => {
+    if (btn.innerHTML.includes('Installa')) {
+      btn.remove();
+    }
+  });
+});
+
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   if (isStreaming) {
     stopCamera();
   }
+  stopHeartbeat();
 });
+
+// Handle PWA specific events
+window.addEventListener('appinstalled', () => {
+  console.log('✅ PWA app installed');
+  // Restart connection after PWA installation
+  setTimeout(() => {
+    if (ws && ws.readyState !== WebSocket.OPEN) {
+      console.log('🔄 Restarting connection after PWA installation');
+      reconnectAttempts = 0;
+      isReconnecting = false;
+      connectWebSocket();
+    }
+  }, 1000);
+});
+
+// Handle service worker updates
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('🔄 Service Worker updated, restarting connection');
+    if (ws && ws.readyState !== WebSocket.OPEN) {
+      reconnectAttempts = 0;
+      isReconnecting = false;
+      connectWebSocket();
+    }
+  });
+}
 </script>
 </body>
 </html>

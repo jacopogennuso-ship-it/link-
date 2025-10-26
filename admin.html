@@ -143,6 +143,7 @@ body {
   display: flex !important;
   flex-direction: column !important;
   min-width: 0 !important;
+  max-width: 50% !important;
 }
 
 .video-container {
@@ -173,7 +174,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 0 !important;
+  min-height: 200px !important;
   max-height: 100% !important;
 }
 
@@ -233,9 +234,9 @@ body {
 }
 
 .chat-section {
-  width: 350px !important;
-  min-width: 350px !important;
-  max-width: 350px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  max-width: 50% !important;
   height: 100% !important;
   max-height: 100% !important;
   background: #1a1a1a;
@@ -243,7 +244,6 @@ body {
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
-  flex-shrink: 0 !important;
 }
 
 .chat-header {
@@ -445,19 +445,21 @@ body {
   }
   
   .sidebar {
-    height: 150px;
+    height: 120px;
     overflow-y: auto;
   }
   
   .room-layout {
-    flex-direction: column !important;
-    height: calc(100vh - 150px) !important;
+    flex-direction: row !important;
+    height: calc(100vh - 120px) !important;
     padding: 10px !important;
     gap: 10px !important;
   }
   
   .video-section {
     flex: 1 !important;
+    min-width: 0 !important;
+    max-width: 50% !important;
     min-height: 200px !important;
   }
   
@@ -470,25 +472,70 @@ body {
   }
   
   .chat-section {
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    height: 200px !important;
-    max-height: 200px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    max-width: 50% !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
   
   .chat-messages {
-    max-height: 120px !important;
+    max-height: calc(100% - 120px) !important;
+    overflow-y: auto !important;
+  }
+  
+  .camera-controls {
+    flex-direction: row;
+    gap: 5px;
+  }
+  
+  .camera-btn {
+    flex: 1;
+    padding: 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    height: 100px;
+  }
+  
+  .room-layout {
+    height: calc(100vh - 100px) !important;
+    padding: 5px !important;
+    gap: 5px !important;
+  }
+  
+  .video-section {
+    min-height: 150px !important;
+  }
+  
+  .video-container {
+    min-height: 150px !important;
+    padding: 10px;
+  }
+  
+  .video-wrapper {
+    min-height: 120px !important;
+  }
+  
+  .chat-section {
+    min-height: 150px !important;
+  }
+  
+  .chat-messages {
+    max-height: calc(100% - 100px) !important;
   }
   
   .camera-controls {
     flex-direction: column;
-    gap: 10px;
+    gap: 3px;
   }
   
   .camera-btn {
-    width: 100%;
-    padding: 10px;
+    padding: 6px;
+    font-size: 10px;
   }
 }
 

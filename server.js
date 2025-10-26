@@ -180,7 +180,8 @@ wss.on('connection', (ws, req)=>{
                 type: 'pushNotification',
                 title: 'Nuovo messaggio da Admin',
                 body: message.text,
-                icon: '/icons/icon-192x192.svg'
+                icon: '/icons/icon-192x192.svg',
+                badge: '/icons/icon-72x72.svg'
               }));
               
               console.log(`Push notification sent to room ${targetRoom}: ${message.text}`);
@@ -249,6 +250,12 @@ wss.on('connection', (ws, req)=>{
             }));
           }
         }
+      }
+
+      // Heartbeat ping for PWA connection stability
+      if(data.type==='ping'){
+        console.log(`💓 Heartbeat received from ${ws.role} ${room || 'admin'}`);
+        ws.send(JSON.stringify({ type:'pong', timestamp: data.timestamp }));
       }
 
     }catch(err){ console.error(err); }
