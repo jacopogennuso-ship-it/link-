@@ -3,98 +3,597 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Chat + Video</title>
+<title>Admin Dashboard</title>
 <style>
-body{margin:0;font-family:Segoe UI,Arial;background:#0b0b0b;color:#dfffdc}
-header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#021002;color:#2EA144}
-h1{margin:0;font-size:18px}
-.container{display:flex;flex-wrap:wrap;gap:12px;padding:12px}
-.video-container{flex:1 1 45%;background:#011001;padding:6px;border-radius:8px;display:flex;flex-direction:column;align-items:center}
-.video-container img{width:100%;border-radius:6px;background:#000}
-.video-container h2{margin:6px 0 4px 0;font-size:14px;color:#2EA144}
-.video-container .status{font-size:11px;color:#9fe;margin-bottom:4px;text-align:center}
-.chat-container{flex:1 1 100%;display:flex;flex-direction:column;background:#011001;border-radius:8px;height:400px;overflow:hidden;margin-top:12px}
-#chat{flex:1;overflow:auto;padding:8px}
-.row{display:flex;margin:6px 0}
-.row.me{justify-content:flex-end}
-.bubble{max-width:70%;padding:6px 10px;border-radius:14px;background:#0b4f2a;font-size:14px;line-height:1.2}
-.row.me .bubble{background:#2EA144;color:#001}
-.meta{font-size:10px;color:#9fe;margin-top:2px;text-align:right}
-.controls{display:flex;padding:6px;border-top:1px solid #023;background:#011001}
-.controls input{flex:1;padding:6px;border-radius:6px;border:1px solid #234;background:#091009;color:#dfffdc}
-.controls button{margin-left:6px;padding:6px 10px;background:#2EA144;border:none;color:#001;border-radius:6px;cursor:pointer}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a0a0a;
+  color: #fff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.dashboard {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 300px;
+  background: #1a1a1a;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 20px;
+  background: #075e54;
+  border-bottom: 1px solid #333;
+}
+
+.sidebar-header h1 {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.sidebar-header p {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.rooms-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.room-item {
+  padding: 15px;
+  margin-bottom: 5px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 2px solid transparent;
+}
+
+.room-item:hover {
+  background: #333;
+}
+
+.room-item.active {
+  background: #075e54;
+  border-color: #25d366;
+}
+
+.room-item h3 {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.room-item p {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #111;
+}
+
+.content-header {
+  padding: 20px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-header h2 {
+  font-size: 16px;
+}
+
+.camera-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.camera-btn {
+  padding: 8px 16px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.camera-btn:hover {
+  background: #333;
+}
+
+.camera-btn.active {
+  background: #25d366;
+  border-color: #25d366;
+}
+
+.video-section {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.video-container {
+  flex: 1;
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 300px;
+}
+
+.video-container h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #25d366;
+}
+
+.video-container img {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 8px;
+  background: #000;
+  min-height: 200px;
+  object-fit: contain;
+}
+
+.video-status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+.chat-section {
+  width: 350px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  padding: 15px;
+  background: #075e54;
+  border-bottom: 1px solid #333;
+}
+
+.chat-header h3 {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.chat-header p {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  background: #0a0a0a;
+}
+
+.message {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.message.sent {
+  flex-direction: row-reverse;
+}
+
+.message-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  position: relative;
+  word-wrap: break-word;
+  font-size: 13px;
+}
+
+.message.received .message-bubble {
+  background: #2a2a2a;
+  border-bottom-left-radius: 4px;
+}
+
+.message.sent .message-bubble {
+  background: #075e54;
+  border-bottom-right-radius: 4px;
+}
+
+.message-time {
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.message.received .message-time {
+  text-align: left;
+}
+
+.attachment {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.attachment img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.attachment-file {
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.chat-input {
+  padding: 15px;
+  background: #2a2a2a;
+  border-top: 1px solid #333;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-input input {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 10px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+}
+
+.chat-input input::placeholder {
+  color: #999;
+}
+
+.send-btn {
+  background: #25d366;
+  border: none;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.send-btn:hover {
+  background: #20c55a;
+}
+
+.no-room-selected {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 16px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    height: 200px;
+  }
+  
+  .rooms-list {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+  }
+  
+  .room-item {
+    min-width: 200px;
+    margin-bottom: 0;
+  }
+  
+  .video-section {
+    flex-direction: column;
+  }
+  
+  .chat-section {
+    width: 100%;
+    height: 300px;
+  }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>Admin — Chat + Video</h1>
-  <div id="status">Connesso</div>
-</header>
-
-<div class="container">
-  <div class="video-container">
-    <h2>Camera Posteriore</h2>
-    <img id="video-back"/>
-    <div class="status" id="status-back">Offline</div>
+<div class="dashboard">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Admin Dashboard</h1>
+      <p id="connectionStatus">Connesso</p>
+    </div>
+    <div class="rooms-list" id="roomsList">
+      <!-- Rooms will be populated here -->
+    </div>
   </div>
-  <div class="video-container">
-    <h2>Camera Frontale</h2>
-    <img id="video-front"/>
-    <div class="status" id="status-front">Offline</div>
-  </div>
-</div>
-
-<div class="chat-container">
-  <div id="chat"></div>
-  <div class="controls">
-    <input type="text" id="text" placeholder="Scrivi un messaggio..." />
-    <button id="sendBtn">Invia</button>
+  
+  <div class="main-content">
+    <div class="content-header">
+      <h2 id="selectedRoomTitle">Seleziona una stanza</h2>
+      <div class="camera-controls" id="cameraControls" style="display: none;">
+        <button class="camera-btn" id="frontCameraBtn">Frontale</button>
+        <button class="camera-btn active" id="backCameraBtn">Posteriore</button>
+      </div>
+    </div>
+    
+    <div id="mainContent">
+      <div class="no-room-selected">
+        Seleziona una stanza per iniziare
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 const ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?role=admin`);
-const chatEl=document.getElementById('chat');
-const textIn=document.getElementById('text');
-const sendBtn=document.getElementById('sendBtn');
-const statusEl=document.getElementById('status');
-const videoBack=document.getElementById('video-back');
-const videoFront=document.getElementById('video-front');
-const statusBack=document.getElementById('status-back');
-const statusFront=document.getElementById('status-front');
+const connectionStatus = document.getElementById('connectionStatus');
+const roomsList = document.getElementById('roomsList');
+const selectedRoomTitle = document.getElementById('selectedRoomTitle');
+const mainContent = document.getElementById('mainContent');
+const cameraControls = document.getElementById('cameraControls');
+const frontCameraBtn = document.getElementById('frontCameraBtn');
+const backCameraBtn = document.getElementById('backCameraBtn');
 
-function addMessage(from,text,me=false){
-  const row=document.createElement('div');
-  row.className='row'+(me?' me':'');
-  const bubble=document.createElement('div');
-  bubble.className='bubble';
-  bubble.innerHTML=`<div>${text}</div><div class="meta">${from} • ${new Date().toLocaleTimeString()}</div>`;
-  row.appendChild(bubble);
-  chatEl.appendChild(row);
-  chatEl.scrollTop=chatEl.scrollHeight;
-}
+let selectedRoom = null;
+let currentCamera = 'back';
+let videoStreams = {};
 
-ws.addEventListener('open',()=>statusEl.textContent='Connesso');
-ws.addEventListener('close',()=>statusEl.textContent='Disconnesso');
-
-ws.addEventListener('message',e=>{
-  try{
-    const data=JSON.parse(e.data);
-    if(data.type==='chat') addMessage(data.from,data.text,false);
-    if(data.type==='video'){
-      if(data.cam==='back'){ videoBack.src=data.image; statusBack.textContent='Live'; }
-      if(data.cam==='front'){ videoFront.src=data.image; statusFront.textContent='Live'; }
-    }
-  }catch(err){console.error(err);}
+// Connection status
+ws.addEventListener('open', () => {
+  connectionStatus.textContent = 'Connesso';
 });
 
-sendBtn.onclick=()=>{
-  const text=textIn.value.trim();
-  if(!text) return;
-  ws.send(JSON.stringify({type:'chat',text}));
-  addMessage('Tu',text,true);
-  textIn.value='';
-};
+ws.addEventListener('close', () => {
+  connectionStatus.textContent = 'Disconnesso';
+});
+
+ws.addEventListener('error', () => {
+  connectionStatus.textContent = 'Errore';
+});
+
+// Handle WebSocket messages
+ws.addEventListener('message', e => {
+  try {
+    const data = JSON.parse(e.data);
+    
+    if (data.type === 'roomsList') {
+      updateRoomsList(data.rooms);
+    }
+    
+    if (data.type === 'clientConnected') {
+      updateRoomsList([...Array.from(new Set([...getCurrentRooms(), data.room]))]);
+    }
+    
+    if (data.type === 'clientDisconnected') {
+      updateRoomsList(getCurrentRooms().filter(room => room !== data.room));
+    }
+    
+    if (data.type === 'chat' && selectedRoom === data.from) {
+      addMessage(data.from, data.text, false, data.attachment, data.timestamp);
+    }
+    
+    if (data.type === 'video' && selectedRoom === data.room) {
+      updateVideoStream(data.cam, data.image);
+    }
+    
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+function getCurrentRooms() {
+  return Array.from(roomsList.querySelectorAll('.room-item')).map(item => item.dataset.room);
+}
+
+function updateRoomsList(rooms) {
+  roomsList.innerHTML = '';
+  
+  if (rooms.length === 0) {
+    roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
+    return;
+  }
+  
+  rooms.forEach(room => {
+    const roomEl = document.createElement('div');
+    roomEl.className = 'room-item';
+    roomEl.dataset.room = room;
+    roomEl.innerHTML = `
+      <h3>Stanza ${room}</h3>
+      <p>Online</p>
+    `;
+    
+    roomEl.addEventListener('click', () => selectRoom(room));
+    roomsList.appendChild(roomEl);
+  });
+}
+
+function selectRoom(room) {
+  selectedRoom = room;
+  
+  // Update UI
+  document.querySelectorAll('.room-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  document.querySelector(`[data-room="${room}"]`).classList.add('active');
+  
+  selectedRoomTitle.textContent = `Stanza ${room}`;
+  cameraControls.style.display = 'flex';
+  
+  // Create room content
+  mainContent.innerHTML = `
+    <div class="video-section">
+      <div class="video-container">
+        <h3>Camera Posteriore</h3>
+        <img id="video-back" src="" alt="Camera posteriore">
+        <div class="video-status" id="status-back">Offline</div>
+      </div>
+      <div class="video-container">
+        <h3>Camera Frontale</h3>
+        <img id="video-front" src="" alt="Camera frontale">
+        <div class="video-status" id="status-front">Offline</div>
+      </div>
+    </div>
+    <div class="chat-section">
+      <div class="chat-header">
+        <h3>Chat - Stanza ${room}</h3>
+        <p>Messaggi in tempo reale</p>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Scrivi un messaggio...">
+        <button class="send-btn" id="sendBtn">Invia</button>
+      </div>
+    </div>
+  `;
+  
+  // Setup chat functionality
+  setupChat();
+  
+  // Notify server about room selection
+  ws.send(JSON.stringify({ type: 'selectRoom', room }));
+}
+
+function setupChat() {
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  
+  function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    
+    ws.send(JSON.stringify({ type: 'chat', text, room: selectedRoom }));
+    addMessage('Tu', text, true);
+    chatInput.value = '';
+  }
+  
+  sendBtn.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+}
+
+function addMessage(from, text, me = false, attachment = null, timestamp = null) {
+  const chatMessages = document.getElementById('chatMessages');
+  if (!chatMessages) return;
+  
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${me ? 'sent' : 'received'}`;
+  
+  const bubbleEl = document.createElement('div');
+  bubbleEl.className = 'message-bubble';
+  
+  if (text) {
+    bubbleEl.innerHTML = `<div>${text}</div>`;
+  }
+  
+  if (attachment) {
+    const attachmentEl = document.createElement('div');
+    attachmentEl.className = 'attachment';
+    
+    if (attachment.type === 'image') {
+      attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
+    } else {
+      attachmentEl.innerHTML = `
+        <div class="attachment-file">
+          <span>📎</span>
+          <span>${attachment.name}</span>
+        </div>
+      `;
+    }
+    bubbleEl.appendChild(attachmentEl);
+  }
+  
+  const timeEl = document.createElement('div');
+  timeEl.className = 'message-time';
+  timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+  bubbleEl.appendChild(timeEl);
+  
+  messageEl.appendChild(bubbleEl);
+  chatMessages.appendChild(messageEl);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function updateVideoStream(camera, imageData) {
+  const videoEl = document.getElementById(`video-${camera}`);
+  const statusEl = document.getElementById(`status-${camera}`);
+  
+  if (videoEl && imageData) {
+    videoEl.src = imageData;
+    if (statusEl) statusEl.textContent = 'Live';
+  }
+}
+
+// Camera controls
+frontCameraBtn.addEventListener('click', () => {
+  if (selectedRoom) {
+    currentCamera = 'front';
+    frontCameraBtn.classList.add('active');
+    backCameraBtn.classList.remove('active');
+    ws.send(JSON.stringify({ 
+      type: 'cameraControl', 
+      targetRoom: selectedRoom, 
+      camera: 'front' 
+    }));
+  }
+});
+
+backCameraBtn.addEventListener('click', () => {
+  if (selectedRoom) {
+    currentCamera = 'back';
+    backCameraBtn.classList.add('active');
+    frontCameraBtn.classList.remove('active');
+    ws.send(JSON.stringify({ 
+      type: 'cameraControl', 
+      targetRoom: selectedRoom, 
+      camera: 'back' 
+    }));
+  }
+});
 </script>
 </body>
 </html>
