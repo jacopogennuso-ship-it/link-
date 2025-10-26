@@ -809,11 +809,27 @@ function connectWebSocket() {
       startCamera();
     }
     
+    // Request chat history from server
+    console.log('📚 Requesting chat history from server');
+    ws.send(JSON.stringify({
+      type: 'getChatHistory',
+      room: room
+    }));
+    
+    // Fallback: load from localStorage if server doesn't respond within 3 seconds
+    setTimeout(() => {
+      const messagesEl = document.getElementById('messages');
+      if (messagesEl && messagesEl.children.length === 0) {
+        console.log('📚 Server timeout, loading from localStorage as fallback');
+        loadMessagesFromLocalStorage();
+      }
+    }, 3000);
+    
             // Send room selection to server
             ws.send(JSON.stringify({ type: 'selectRoom', room: room }));
             
-            // Load messages from localStorage
-            loadMessagesFromLocalStorage();
+            // Don't load from localStorage - wait for server response
+            // loadMessagesFromLocalStorage();
             
             // Start heartbeat to keep connection alive in PWA
             startHeartbeat();
@@ -983,6 +999,35 @@ function setupChatFunctionality() {
         if (document.hidden || !document.hasFocus()) {
           showInAppNotification('Nuovo messaggio', `${data.from}: ${data.text}`);
         }
+      }
+      
+      if (data.type === 'chatHistory') {
+        console.log('📚 Received chat history from server:', data.messages.length, 'messages');
+        
+        // Clear existing messages
+        const messagesEl = document.getElementById('messages');
+        if (messagesEl) {
+          messagesEl.innerHTML = '';
+        }
+        
+        // Clear localStorage and save server messages
+        const roomId = localStorage.getItem('clientRoomId') || room;
+        const key = `chat_${roomId}`;
+        localStorage.setItem(key, JSON.stringify([])); // Clear existing messages
+        
+        // Load all messages from history
+        data.messages.forEach((msg, index) => {
+          const isMe = msg.from === room; // Check if message is from current user
+          console.log(`📚 Loading message ${index + 1}: ${msg.from} - ${msg.text}`);
+          addMessage(msg.from, msg.text, isMe, msg.attachment, msg.timestamp);
+        });
+        
+        // Scroll to bottom
+        if (messagesEl) {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        
+        console.log(`📚 Chat history loaded: ${data.messages.length} messages`);
       }
       
       if (data.type === 'pushNotification') {
@@ -1378,7 +1423,26 @@ function sendAudioStream() {
   
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   audioSource = audioContext.createMediaStreamSource(videoStream);
-  audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+  
+  // Use AudioWorkletNode if available, otherwise fallback to ScriptProcessorNode
+  if (audioContext.audioWorklet) {
+    try {
+      // Try to use AudioWorkletNode (modern approach)
+      audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+      console.log('📢 Using ScriptProcessorNode for audio (fallback)');
+    } catch (err) {
+      console.warn('AudioWorkletNode not available, using ScriptProcessorNode:', err);
+      audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+    }
+  } else {
+    // Fallback to ScriptProcessorNode
+    audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+    console.log('📢 Using ScriptProcessorNode for audio (legacy)');
+  }
+  
+  let audioBuffer = [];
+  let audioBufferSize = 0;
+  const maxBufferSize = 4096; // Buffer size before sending
   
   audioProcessor.onaudioprocess = (event) => {
     if (!isStreaming) return;
@@ -1386,27 +1450,36 @@ function sendAudioStream() {
     const inputBuffer = event.inputBuffer;
     const inputData = inputBuffer.getChannelData(0);
     
-    // Convert audio to base64 and send
-    const audioData = new Float32Array(inputData);
-    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+    // Add to buffer
+    audioBuffer.push(...inputData);
+    audioBufferSize += inputData.length;
     
-    ws.send(JSON.stringify({
-      type: 'audio',
-      room,
-      audio: audioBase64,
-      sampleRate: audioContext.sampleRate
-    }));
+    // Send when buffer is full
+    if (audioBufferSize >= maxBufferSize) {
+      // Convert audio to base64 and send
+      const audioData = new Float32Array(audioBuffer);
+      const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+      
+      console.log(`🎵 Sending audio chunk: ${audioBase64.length} bytes, sampleRate: ${audioContext.sampleRate}`);
+      
+      ws.send(JSON.stringify({
+        type: 'audio',
+        room,
+        audio: audioBase64,
+        sampleRate: audioContext.sampleRate
+      }));
+      
+      // Reset buffer
+      audioBuffer = [];
+      audioBufferSize = 0;
+    }
   };
   
   audioSource.connect(audioProcessor);
   audioProcessor.connect(audioContext.destination);
   
-  // Restart audio stream every 5 seconds to keep it continuous
-  setTimeout(() => {
-    if (isStreaming) {
-      sendAudioStream();
-    }
-  }, 5000);
+  // Keep audio stream alive without restarting
+  // Audio context will stay active as long as isStreaming is true
 }
 
 // Check for saved room first

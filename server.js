@@ -414,6 +414,30 @@ wss.on('connection', (ws, req)=>{
         }
       }
 
+      // Handle chat history request
+      if(data.type==='getChatHistory'){
+        const targetRoom = data.room || ws.selectedRoom || room;
+        if(targetRoom && chatHistory.has(targetRoom)){
+          const messages = chatHistory.get(targetRoom);
+          ws.send(JSON.stringify({
+            type: 'chatHistory',
+            room: targetRoom,
+            messages: messages
+          }));
+          const userType = ws.role === 'admin' ? 'admin' : 'client';
+          console.log(`📚 Sent chat history to ${userType} for room ${targetRoom}: ${messages.length} messages`);
+        } else {
+          // Send empty history if no messages
+          ws.send(JSON.stringify({
+            type: 'chatHistory',
+            room: targetRoom,
+            messages: []
+          }));
+          const userType = ws.role === 'admin' ? 'admin' : 'client';
+          console.log(`📚 No chat history found for room ${targetRoom} (${userType})`);
+        }
+      }
+
       // Video with improved streaming
       if(data.type==='video'){
         admins.forEach(a=>{
@@ -427,17 +451,30 @@ wss.on('connection', (ws, req)=>{
         });
       }
 
-      // Audio streaming
+      // Audio streaming with quality checks
       if(data.type==='audio'){
-        admins.forEach(a=>{
-          if(a.readyState===ws.OPEN) a.send(JSON.stringify({ 
-            type:'audio', 
-            room:room, 
-            audio:data.audio,
-            sampleRate: data.sampleRate,
-            timestamp: Date.now()
-          }));
-        });
+        // Validate audio data
+        if(data.audio && data.sampleRate && data.audio.length > 0) {
+          console.log(`🎵 Audio received from client ${room}: ${data.audio.length} bytes, sampleRate: ${data.sampleRate}`);
+          admins.forEach(a=>{
+            if(a.readyState===ws.OPEN) {
+              try {
+                a.send(JSON.stringify({ 
+                  type:'audio', 
+                  room:room, 
+                  audio:data.audio,
+                  sampleRate: data.sampleRate,
+                  timestamp: Date.now()
+                }));
+                console.log(`🎵 Audio forwarded to admin`);
+              } catch (err) {
+                console.error('Error sending audio to admin:', err);
+              }
+            }
+          });
+        } else {
+          console.warn('Invalid audio data received from client:', data);
+        }
       }
 
       // Camera control from admin

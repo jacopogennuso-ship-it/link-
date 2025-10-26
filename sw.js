@@ -1,14 +1,9 @@
-const CACHE_NAME = 'jacopo-chat-v2';
+const CACHE_NAME = 'jacopo-chat-v3';
 const urlsToCache = [
   '/',
-  '/admin',
   '/index.html',
   '/admin.html',
-  '/manifest.json',
-  '/icons/icon-192x192.svg',
-  '/icons/icon-72x72.svg',
-  '/icons/icon-32x32.svg',
-  '/icons/icon-16x16.svg'
+  '/manifest.json'
 ];
 
 // Install event
@@ -18,10 +13,22 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Cache opened');
-        return cache.addAll(urlsToCache);
+        // Add files one by one to handle missing files gracefully
+        return Promise.allSettled(
+          urlsToCache.map(url => 
+            cache.add(url).catch(err => {
+              console.log(`Failed to cache ${url}:`, err);
+              return null;
+            })
+          )
+        );
       })
       .then(() => {
         console.log('Service Worker installed');
+        return self.skipWaiting();
+      })
+      .catch(err => {
+        console.log('Service Worker install failed:', err);
         return self.skipWaiting();
       })
   );
@@ -54,10 +61,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Don't cache admin connections
+  if (event.request.url.includes('/admin')) {
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        return response || fetch(event.request);
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).catch(err => {
+          console.log('Fetch failed:', err);
+          return new Response('Offline', { status: 503 });
+        });
       })
   );
 });

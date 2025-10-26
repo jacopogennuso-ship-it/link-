@@ -447,16 +447,15 @@ body {
   }
   
   .sidebar {
-    height: 60px !important;
-    overflow: hidden !important;
-    flex-direction: row !important;
-    padding: 5px !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 1000 !important;
+    height: auto !important;
+    min-height: 100px !important;
+    overflow: visible !important;
+    flex-direction: column !important;
+    padding: 10px !important;
+    position: relative !important;
     background: #075e54 !important;
+    border-bottom: 2px solid #0a6b5f !important;
+    flex-shrink: 0 !important;
   }
   
   .sidebar-header {
@@ -480,19 +479,25 @@ body {
   
   .rooms-list {
     display: flex !important;
+    flex-wrap: wrap !important;
     overflow-x: auto !important;
-    overflow-y: hidden !important;
-    padding: 0 5px !important;
-    gap: 5px !important;
+    overflow-y: visible !important;
+    padding: 10px 0 !important;
+    gap: 8px !important;
     flex: 1 !important;
+    min-height: 60px !important;
   }
   
   .room-item {
-    min-width: 100px !important;
+    min-width: 120px !important;
     margin-bottom: 0 !important;
-    padding: 5px !important;
-    font-size: 10px !important;
+    padding: 8px !important;
+    font-size: 12px !important;
     flex-shrink: 0 !important;
+    background: #2a2a2a !important;
+    border: 1px solid #444 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
   }
   
   .room-item h3 {
@@ -510,8 +515,8 @@ body {
   
   .main-content {
     flex: 1 !important;
-    height: calc(100vh - 60px) !important;
-    margin-top: 60px !important;
+    height: calc(100vh - 100px) !important;
+    margin-top: 0 !important;
     overflow: hidden !important;
   }
   
@@ -550,18 +555,18 @@ body {
   }
   
   .video-section {
-    flex: 0 0 60% !important;
+    flex: 0 0 30% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-    min-height: 250px !important;
-    max-height: 60% !important;
+    min-height: 150px !important;
+    max-height: 30% !important;
     overflow: hidden !important;
     background: #000 !important;
     border-radius: 8px 8px 0 0 !important;
   }
   
   .video-container {
-    min-height: 200px !important;
+    min-height: 120px !important;
     padding: 0 !important;
     height: 100% !important;
     display: flex !important;
@@ -570,7 +575,7 @@ body {
   }
   
   .video-wrapper {
-    min-height: 200px !important;
+    min-height: 120px !important;
     height: 100% !important;
     width: 100% !important;
     display: flex !important;
@@ -586,17 +591,7 @@ body {
   }
   
   .chat-section {
-    flex: 0 0 40% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-    height: 40% !important;
-    max-height: 40% !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    background: #f8f9fa !important;
-    border-radius: 0 0 8px 8px !important;
-    border: 1px solid #e9ecef !important;
+    display: none !important;
   }
   
   .chat-messages {
@@ -724,7 +719,7 @@ body {
   
   .room-layout {
     flex-direction: column !important;
-    height: calc(100vh - 100px) !important;
+    height: calc(100vh - 120px) !important;
     padding: 0 !important;
     gap: 0 !important;
   }
@@ -847,7 +842,7 @@ body {
 @media (max-width: 768px) and (orientation: landscape) {
   .room-layout {
     flex-direction: row !important;
-    height: calc(100vh - 100px) !important;
+    height: calc(100vh - 120px) !important;
   }
   
   .video-section {
@@ -888,6 +883,180 @@ body {
   
   .main-content {
     height: calc(100vh - 70px) !important;
+  }
+  
+  /* Simple Chat Button */
+  .chat-toggle-btn {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 60px !important;
+    height: 60px !important;
+    background: #075e54 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 50% !important;
+    font-size: 24px !important;
+    cursor: pointer !important;
+    z-index: 1000 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
+  .chat-toggle-btn.has-messages {
+    background: #dc3545 !important;
+    animation: pulse 1s infinite !important;
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  
+  /* Simple Fullscreen Chat */
+  .chat-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: white !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .chat-fullscreen .header {
+    background: #075e54 !important;
+    color: white !important;
+    padding: 20px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  
+  .chat-fullscreen .header h2 {
+    margin: 0 !important;
+    font-size: 24px !important;
+  }
+  
+  .chat-fullscreen .close-btn {
+    background: #dc3545 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 5px !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+  }
+  
+  .chat-fullscreen .messages {
+    flex: 1 !important;
+    padding: 20px !important;
+    overflow-y: auto !important;
+    background: #f8f9fa !important;
+  }
+  
+  .chat-fullscreen .message {
+    background: white !important;
+    padding: 15px !important;
+    margin: 10px 0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    color: #333 !important;
+  }
+  
+  .chat-fullscreen .message.admin {
+    background: #075e54 !important;
+    color: white !important;
+    margin-left: 20% !important;
+  }
+  
+  .chat-fullscreen .message strong {
+    color: #075e54 !important;
+    font-weight: bold !important;
+  }
+  
+  .chat-fullscreen .message.admin strong {
+    color: white !important;
+  }
+  
+  .chat-fullscreen .message small {
+    color: #666 !important;
+    font-size: 11px !important;
+  }
+  
+  .chat-fullscreen .message.admin small {
+    color: #e0e0e0 !important;
+  }
+  
+  .chat-fullscreen .message-bubble {
+    max-width: 80% !important;
+    padding: 10px 14px !important;
+    border-radius: 18px !important;
+    position: relative !important;
+    word-wrap: break-word !important;
+    font-size: 13px !important;
+  }
+  
+  .chat-fullscreen .message.received .message-bubble {
+    background: #2a2a2a !important;
+    color: white !important;
+    border-bottom-left-radius: 4px !important;
+  }
+  
+  .chat-fullscreen .message.sent .message-bubble {
+    background: #075e54 !important;
+    color: white !important;
+    border-bottom-right-radius: 4px !important;
+  }
+  
+  .chat-fullscreen .message-time {
+    font-size: 10px !important;
+    color: #999 !important;
+    margin-top: 4px !important;
+    text-align: right !important;
+  }
+  
+  .chat-fullscreen .message.received .message-time {
+    text-align: left !important;
+  }
+  
+  .chat-fullscreen .attachment {
+    margin-top: 8px !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    max-width: 200px !important;
+  }
+  
+  .chat-fullscreen .input-area {
+    padding: 20px !important;
+    background: white !important;
+    border-top: 1px solid #ddd !important;
+    display: flex !important;
+    gap: 10px !important;
+  }
+  
+  .chat-fullscreen .input-area input {
+    flex: 1 !important;
+    padding: 15px !important;
+    border: 2px solid #ddd !important;
+    border-radius: 25px !important;
+    font-size: 16px !important;
+    outline: none !important;
+  }
+  
+  .chat-fullscreen .input-area button {
+    background: #075e54 !important;
+    color: white !important;
+    border: none !important;
+    padding: 15px 25px !important;
+    border-radius: 25px !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
   }
   
   .content-header {
@@ -1169,6 +1338,11 @@ let videoStreams = {};
 let ws = null;
 let adminHeartbeatInterval = null;
 
+// Audio variables - moved to top to avoid initialization errors
+let adminAudioContext = null;
+let adminAudioQueue = [];
+let isPlayingAudio = false;
+
 // Initialize admin login
 function initializeAdminLogin() {
   adminLoginBtn.addEventListener('click', handleAdminLogin);
@@ -1184,23 +1358,45 @@ function handleAdminLogin() {
   const username = adminUsername.value.trim();
   const password = adminPassword.value.trim();
   
+  console.log('🔐 Login attempt:', { username, password });
+  console.log('🔐 Expected credentials:', ADMIN_CREDENTIALS);
+  
   if (!username || !password) {
+    console.log('❌ Missing username or password');
     showLoginError('Inserisci username e password');
     return;
   }
   
   if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    console.log('✅ Login successful');
     // Save login state to localStorage
     localStorage.setItem('adminLoggedIn', 'true');
     localStorage.setItem('adminLoginTime', Date.now().toString());
     
     // Login successful
-    adminLoginContainer.style.display = 'none';
-    adminDashboard.style.display = 'flex';
+    console.log('🔍 Hiding login container, showing dashboard');
+    console.log('🔍 adminLoginContainer:', adminLoginContainer);
+    console.log('🔍 adminDashboard:', adminDashboard);
     
-    // Initialize WebSocket connection
-    initializeWebSocket();
+    if (adminLoginContainer) {
+      adminLoginContainer.style.display = 'none';
+      console.log('✅ Login container hidden');
+    } else {
+      console.log('❌ adminLoginContainer not found');
+    }
+    
+    if (adminDashboard) {
+      adminDashboard.style.display = 'flex';
+      console.log('✅ Dashboard shown');
+    } else {
+      console.log('❌ adminDashboard not found');
+    }
+    
+  // Initialize WebSocket connection
+  initializeWebSocket();
+  
   } else {
+    console.log('❌ Invalid credentials');
     showLoginError('Credenziali non valide');
   }
 }
@@ -1237,12 +1433,17 @@ function checkAdminSession() {
   const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
   const loginTime = localStorage.getItem('adminLoginTime');
   
+  console.log('🔍 Checking admin session:', { isLoggedIn, loginTime });
+  
   if (isLoggedIn && loginTime) {
     // Check if session is not older than 24 hours
     const sessionAge = Date.now() - parseInt(loginTime);
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     
+    console.log('🔍 Session age:', sessionAge, 'Max age:', maxAge);
+    
     if (sessionAge < maxAge) {
+      console.log('✅ Session is valid, auto-login');
       // Session is valid, auto-login
       adminLoginContainer.style.display = 'none';
       adminDashboard.style.display = 'flex';
@@ -1257,12 +1458,14 @@ function checkAdminSession() {
       
       return true;
     } else {
+      console.log('❌ Session expired, clearing');
       // Session expired, clear it
       localStorage.removeItem('adminLoggedIn');
       localStorage.removeItem('adminLoginTime');
     }
   }
   
+  console.log('❌ No valid session found');
   return false;
 }
 
@@ -1314,6 +1517,7 @@ function initializeWebSocket() {
       const data = JSON.parse(e.data);
     
       if (data.type === 'roomsList') {
+        console.log('📋 Received rooms list:', data.rooms);
         updateRoomsList(data.rooms);
       }
       
@@ -1328,10 +1532,10 @@ function initializeWebSocket() {
       if (data.type === 'chat') {
         console.log('📨 Admin received chat message:', data);
         // Only show messages for the selected room
-        if (selectedRoom === data.from) {
+        if (selectedRoom === data.room) {
           addMessage(data.from, data.text, false, data.attachment, data.timestamp);
         } else {
-          console.log(`📨 Message from ${data.from} but selected room is ${selectedRoom}`);
+          console.log(`📨 Message from ${data.from} in room ${data.room} but selected room is ${selectedRoom}`);
         }
       }
       
@@ -1366,26 +1570,314 @@ function initializeWebSocket() {
     return Array.from(roomsList.querySelectorAll('.room-item')).map(item => item.dataset.room);
   }
 
+  // Simple chat functions
+  let unreadMessages = 0;
+  
+  function openChatFullscreen() {
+    console.log('🔍 Opening simple chat for room:', selectedRoom);
+    
+    const chatPopup = document.createElement('div');
+    chatPopup.className = 'chat-fullscreen';
+    chatPopup.innerHTML = `
+      <div class="header">
+        <h2>💬 Chat - ${selectedRoom}</h2>
+        <button class="close-btn" onclick="closeChatFullscreen()">✕ Chiudi</button>
+      </div>
+      <div class="messages" id="chat-messages">
+        <div class="message">
+          <strong>Benvenuto nella chat!</strong><br>
+          Scrivi un messaggio qui sotto.
+        </div>
+      </div>
+      <div class="input-area">
+        <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
+        <button onclick="sendMessage()">Invia</button>
+      </div>
+    `;
+    
+    document.body.appendChild(chatPopup);
+    
+    // Focus on input
+    setTimeout(() => {
+      document.getElementById('chat-input').focus();
+    }, 100);
+    
+    // Load existing messages
+    setTimeout(() => {
+      loadChatMessages();
+    }, 100);
+    
+    // Reset unread messages
+    unreadMessages = 0;
+    updateChatButton();
+  }
+
+  function closeChatFullscreen() {
+    console.log('❌ Closing chat');
+    const chat = document.querySelector('.chat-fullscreen');
+    if (chat) {
+      chat.remove();
+    }
+  }
+
+  function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (message && selectedRoom) {
+      console.log('📤 Sending message:', message);
+      
+      // Send via WebSocket
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'chat',
+          text: message,
+          room: selectedRoom
+        }));
+      }
+      
+      // Add to chat
+      addMessage('Admin', message);
+      
+      // Clear input
+      input.value = '';
+    }
+  }
+
+  function sendFullscreenMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (message && selectedRoom) {
+      console.log('📤 Sending fullscreen message:', message);
+      
+      // Send via WebSocket
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'chat',
+          text: message,
+          room: selectedRoom
+        }));
+      }
+      
+      // Add to chat
+      addFullscreenMessage('Admin', message, true);
+      
+      // Clear input
+      input.value = '';
+    }
+  }
+
+  function addMessage(from, message, isMe = false, attachment = null, timestamp = null) {
+    // Try to add to fullscreen chat first
+    const fullscreenContainer = document.getElementById('chat-messages');
+    if (fullscreenContainer) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${isMe ? 'sent' : 'received'} ${from === 'Admin' ? 'admin' : ''}`;
+      
+      const bubbleEl = document.createElement('div');
+      bubbleEl.className = 'message-bubble';
+      
+      if (message) {
+        bubbleEl.innerHTML = `<div>${message}</div>`;
+      }
+      
+      if (attachment) {
+        const attachmentEl = document.createElement('div');
+        attachmentEl.className = 'attachment';
+        
+        if (attachment.type === 'image') {
+          attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine" style="max-width: 200px; border-radius: 8px;">`;
+        } else {
+          attachmentEl.innerHTML = `
+            <div style="background: #f0f0f0; padding: 5px; border-radius: 4px;">
+              <span>📎</span>
+              <span>${attachment.name}</span>
+            </div>
+          `;
+        }
+        bubbleEl.appendChild(attachmentEl);
+      }
+      
+      const timeEl = document.createElement('div');
+      timeEl.className = 'message-time';
+      timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+      bubbleEl.appendChild(timeEl);
+      
+      messageEl.appendChild(bubbleEl);
+      fullscreenContainer.appendChild(messageEl);
+      fullscreenContainer.scrollTop = fullscreenContainer.scrollHeight;
+    }
+    
+    // Also try to add to normal chat
+    const normalContainer = document.getElementById('chatMessages');
+    if (normalContainer) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${isMe ? 'sent' : 'received'}`;
+      
+      const bubbleEl = document.createElement('div');
+      bubbleEl.className = 'message-bubble';
+      
+      if (message) {
+        bubbleEl.innerHTML = `<div>${message}</div>`;
+      }
+      
+      if (attachment) {
+        const attachmentEl = document.createElement('div');
+        attachmentEl.className = 'attachment';
+        
+        if (attachment.type === 'image') {
+          attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
+        } else {
+          attachmentEl.innerHTML = `
+            <div class="attachment-file">
+              <span>📎</span>
+              <span>${attachment.name}</span>
+            </div>
+          `;
+        }
+        bubbleEl.appendChild(attachmentEl);
+      }
+      
+      const timeEl = document.createElement('div');
+      timeEl.className = 'message-time';
+      timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+      bubbleEl.appendChild(timeEl);
+      
+      messageEl.appendChild(bubbleEl);
+      normalContainer.appendChild(messageEl);
+      normalContainer.scrollTop = normalContainer.scrollHeight;
+    }
+    
+    // Update chat button if message is from client
+    if (from !== 'Admin') {
+      unreadMessages++;
+      updateChatButton();
+    }
+  }
+
+  function addFullscreenMessage(from, message, isMe = false, attachment = null, timestamp = null) {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (messagesContainer) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${isMe ? 'sent' : 'received'} ${from === 'Admin' ? 'admin' : ''}`;
+      
+      const bubbleEl = document.createElement('div');
+      bubbleEl.className = 'message-bubble';
+      
+      if (message) {
+        bubbleEl.innerHTML = `<div>${message}</div>`;
+      }
+      
+      if (attachment) {
+        const attachmentEl = document.createElement('div');
+        attachmentEl.className = 'attachment';
+        
+        if (attachment.type === 'image') {
+          attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine" style="max-width: 200px; border-radius: 8px;">`;
+        } else {
+          attachmentEl.innerHTML = `
+            <div style="background: #f0f0f0; padding: 5px; border-radius: 4px;">
+              <span>📎</span>
+              <span>${attachment.name}</span>
+            </div>
+          `;
+        }
+        bubbleEl.appendChild(attachmentEl);
+      }
+      
+      const timeEl = document.createElement('div');
+      timeEl.className = 'message-time';
+      timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+      bubbleEl.appendChild(timeEl);
+      
+      messageEl.appendChild(bubbleEl);
+      messagesContainer.appendChild(messageEl);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  }
+
+  function loadChatMessages() {
+    // This will be called when chat opens to load existing messages
+    console.log('📚 Loading chat messages for room:', selectedRoom);
+    
+    if (selectedRoom && ws && ws.readyState === WebSocket.OPEN) {
+      // Request chat history from server
+      ws.send(JSON.stringify({
+        type: 'getChatHistory',
+        room: selectedRoom
+      }));
+      console.log('📚 Requested chat history for room:', selectedRoom);
+    }
+  }
+
+  function updateChatButton() {
+    let chatBtn = document.querySelector('.chat-toggle-btn');
+    if (!chatBtn) {
+      chatBtn = document.createElement('button');
+      chatBtn.className = 'chat-toggle-btn';
+      chatBtn.innerHTML = '💬';
+      chatBtn.onclick = openChatFullscreen;
+      document.body.appendChild(chatBtn);
+    }
+    
+    if (unreadMessages > 0) {
+      chatBtn.classList.add('has-messages');
+      chatBtn.innerHTML = `💬 ${unreadMessages}`;
+    } else {
+      chatBtn.classList.remove('has-messages');
+      chatBtn.innerHTML = '💬';
+    }
+  }
+
+  // Test function availability
+  console.log('🔍 openChatFullscreen function available:', typeof openChatFullscreen === 'function');
+  
+  // Make function globally available
+  window.openChatFullscreen = openChatFullscreen;
+  window.closeChatFullscreen = closeChatFullscreen;
+  window.sendFullscreenMessage = sendFullscreenMessage;
+  window.sendMessage = sendMessage;
+  window.addFullscreenMessage = addFullscreenMessage;
+
   function updateRoomsList(rooms) {
+    console.log('🔄 Updating rooms list:', rooms);
+    console.log('🔄 roomsList element:', roomsList);
+    
     roomsList.innerHTML = '';
     
     if (rooms.length === 0) {
+      console.log('📭 No rooms available');
       roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
       return;
     }
     
+    console.log(`📋 Adding ${rooms.length} rooms to list`);
     rooms.forEach(room => {
+      console.log('🏠 Adding room:', room);
+      
+      // Handle both string and object room formats
+      const roomName = typeof room === 'string' ? room : room.name || room.room;
+      const roomId = typeof room === 'object' ? room.roomId : room;
+      
+      console.log('🏠 Room name:', roomName, 'Room ID:', roomId);
+      
       const roomEl = document.createElement('div');
       roomEl.className = 'room-item';
-      roomEl.dataset.room = room;
+      roomEl.dataset.room = roomName;
+      roomEl.dataset.roomId = roomId;
       roomEl.innerHTML = `
-        <h3>Stanza ${room}</h3>
+        <h3>Stanza ${roomName}</h3>
         <p>Online</p>
       `;
       
-      roomEl.addEventListener('click', () => selectRoom(room));
+      roomEl.addEventListener('click', () => selectRoom(roomName));
       roomsList.appendChild(roomEl);
     });
+    
+    console.log('✅ Rooms list updated');
+    console.log('🔍 roomsList innerHTML:', roomsList.innerHTML);
+    console.log('🔍 roomsList children count:', roomsList.children.length);
   }
 
   function selectRoom(room) {
@@ -1399,6 +1891,9 @@ function initializeWebSocket() {
       item.classList.remove('active');
     });
     document.querySelector(`[data-room="${room}"]`).classList.add('active');
+    
+    // Create chat button
+    updateChatButton();
     
     selectedRoomTitle.textContent = `Stanza ${room}`;
     cameraControls.style.display = 'flex';
@@ -1426,6 +1921,7 @@ function initializeWebSocket() {
           <div class="chat-header">
             <h3>Chat - Stanza ${room}</h3>
             <p>Messaggi in tempo reale</p>
+            <button id="fullscreenBtn" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 15px; font-size: 10px; margin-top: 5px;">🔍 FULLSCREEN</button>
           </div>
           <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input">
@@ -1512,53 +2008,6 @@ function initializeWebSocket() {
     adminFileInput.value = '';
   }
 
-  function addMessage(from, text, me = false, attachment = null, timestamp = null) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) {
-      console.log('❌ Chat messages element not found in addMessage');
-      return;
-    }
-    
-    console.log(`💬 Adding message: ${from} - ${text} (me: ${me})`);
-    
-    const messageEl = document.createElement('div');
-    messageEl.className = `message ${me ? 'sent' : 'received'}`;
-    
-    const bubbleEl = document.createElement('div');
-    bubbleEl.className = 'message-bubble';
-    
-    if (text) {
-      bubbleEl.innerHTML = `<div>${text}</div>`;
-    }
-    
-    if (attachment) {
-      const attachmentEl = document.createElement('div');
-      attachmentEl.className = 'attachment';
-      
-      if (attachment.type === 'image') {
-        attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine">`;
-      } else {
-        attachmentEl.innerHTML = `
-          <div class="attachment-file">
-            <span>📎</span>
-            <span>${attachment.name}</span>
-          </div>
-        `;
-      }
-      bubbleEl.appendChild(attachmentEl);
-    }
-    
-    const timeEl = document.createElement('div');
-    timeEl.className = 'message-time';
-    timeEl.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
-    bubbleEl.appendChild(timeEl);
-    
-    messageEl.appendChild(bubbleEl);
-    chatMessages.appendChild(messageEl);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    console.log(`✅ Message added to chat: ${from} - ${text}`);
-  }
 
   function updateVideoStream(camera, imageData) {
     const videoEl = document.getElementById('video-back');
@@ -1574,14 +2023,33 @@ function initializeWebSocket() {
     }
   }
 
-  let adminAudioContext = null;
-  let adminAudioQueue = [];
-  let isPlayingAudio = false;
+
+  let lastAudioTime = 0;
+  let audioTimeout = null;
 
   function updateAudioStream(audioData, sampleRate) {
     const audioIndicator = document.getElementById('audioIndicator');
     if (audioIndicator) {
       audioIndicator.style.display = 'flex';
+      
+      // Update last audio time
+      lastAudioTime = Date.now();
+      
+      // Clear previous timeout
+      if (audioTimeout) {
+        clearTimeout(audioTimeout);
+      }
+      
+      // Set timeout to detect audio loss
+      audioTimeout = setTimeout(() => {
+        console.warn('⚠️ Audio stream lost - no data received for 3 seconds');
+        const audioIndicator = document.getElementById('audioIndicator');
+        if (audioIndicator) {
+          audioIndicator.style.background = 'rgba(220, 53, 69, 0.1)';
+          audioIndicator.style.borderColor = '#dc3545';
+          audioIndicator.style.color = '#dc3545';
+        }
+      }, 3000);
       
       // Add audio data to queue
       adminAudioQueue.push({ audioData, sampleRate });
@@ -1612,35 +2080,56 @@ function initializeWebSocket() {
           await adminAudioContext.resume();
         }
         
-        // Convert base64 back to audio buffer
+        // Convert base64 back to audio buffer with better error handling
         const audioBuffer = atob(audioData);
-        const buffer = adminAudioContext.createBuffer(1, audioBuffer.length / 4, sampleRate);
+        const bufferLength = audioBuffer.length / 4; // Float32Array is 4 bytes per sample
+        
+        // Ensure buffer length is valid
+        if (bufferLength <= 0 || bufferLength > 44100 * 2) { // Max 2 seconds at 44.1kHz
+          console.warn('Invalid audio buffer length:', bufferLength);
+          continue;
+        }
+        
+        const buffer = adminAudioContext.createBuffer(1, bufferLength, sampleRate);
         const channelData = buffer.getChannelData(0);
         
-        // Convert back to float32 array
+        // Convert back to float32 array with bounds checking
         const uint8Array = new Uint8Array(audioBuffer.length);
         for (let i = 0; i < audioBuffer.length; i++) {
           uint8Array[i] = audioBuffer.charCodeAt(i);
         }
-        const float32Array = new Float32Array(uint8Array.buffer);
         
-        for (let i = 0; i < channelData.length; i++) {
+        const float32Array = new Float32Array(uint8Array.buffer);
+        const minLength = Math.min(channelData.length, float32Array.length);
+        
+        for (let i = 0; i < minLength; i++) {
           channelData[i] = float32Array[i];
         }
         
-        // Play audio
+        // Play audio with error handling
         const source = adminAudioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(adminAudioContext.destination);
+        
+        // Add error handling for source
+        source.onended = () => {
+          // Audio finished playing
+        };
+        
         source.start();
         
-        // Wait for audio to finish
-        await new Promise(resolve => {
-          source.onended = resolve;
+        // Wait for audio to finish with timeout
+        await new Promise((resolve) => {
+          const timeout = setTimeout(resolve, 1000); // 1 second timeout
+          source.onended = () => {
+            clearTimeout(timeout);
+            resolve();
+          };
         });
         
       } catch (err) {
         console.error('Error playing audio:', err);
+        // Continue with next audio chunk even if one fails
       }
     }
     
@@ -1648,16 +2137,25 @@ function initializeWebSocket() {
   }
 
   function loadChatHistory(messages) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) {
-      console.log('❌ Chat messages element not found');
-      return;
-    }
-    
     console.log(`📚 Loading chat history: ${messages.length} messages`);
     
-    // Clear existing messages
-    chatMessages.innerHTML = '';
+    // Clear and load messages in normal chat
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.innerHTML = '';
+    }
+    
+    // Clear and load messages in fullscreen chat
+    const fullscreenMessages = document.getElementById('chat-messages');
+    if (fullscreenMessages) {
+      // Keep only the welcome message
+      fullscreenMessages.innerHTML = `
+        <div class="message">
+          <strong>Benvenuto nella chat!</strong><br>
+          Scrivi un messaggio qui sotto.
+        </div>
+      `;
+    }
     
     // Load all messages from history
     messages.forEach((msg, index) => {
@@ -1666,8 +2164,14 @@ function initializeWebSocket() {
       addMessage(msg.from, msg.text, isMe, msg.attachment, msg.timestamp);
     });
     
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Scroll to bottom in both containers
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    if (fullscreenMessages) {
+      fullscreenMessages.scrollTop = fullscreenMessages.scrollHeight;
+    }
+    
     console.log(`📚 Chat history loaded: ${messages.length} messages`);
   }
 
@@ -1756,6 +2260,25 @@ function stopAdminHeartbeat() {
     // No valid session, show login
     initializeAdminLogin();
   }
+
+  // Add global chat fullscreen listener after all functions are defined
+  setTimeout(function() {
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.chat-section')) {
+        console.log('🔍 Chat section clicked, opening fullscreen');
+        if (typeof openChatFullscreen === 'function') {
+          openChatFullscreen();
+        } else {
+          console.log('❌ openChatFullscreen function not defined yet');
+        }
+      }
+    });
+    console.log('✅ Global chat fullscreen listener added');
+    
+    // Test the function
+    console.log('🔍 Testing openChatFullscreen function:', typeof openChatFullscreen === 'function');
+    console.log('🔍 Testing window.openChatFullscreen function:', typeof window.openChatFullscreen === 'function');
+  }, 1000);
 </script>
 </body>
 </html>
