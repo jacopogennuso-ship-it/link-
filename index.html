@@ -227,22 +227,227 @@ body {
   color: #ccc;
 }
 
-@media (max-width: 480px) {
+/* Mobile optimizations */
+@media (max-width: 768px) {
   .chat-container {
-    max-width: 100%;
-    border-radius: 0;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   
   .header {
-    padding: 12px 15px;
+    padding: 10px 15px !important;
+    flex-shrink: 0 !important;
+    background: #075e54 !important;
+    border-bottom: 1px solid #0a4d42 !important;
+  }
+  
+  .header h1 {
+    font-size: 16px !important;
+    margin: 0 !important;
+  }
+  
+  .header p {
+    font-size: 12px !important;
+    margin: 2px 0 0 0 !important;
   }
   
   .messages {
-    padding: 15px;
+    flex: 1 !important;
+    padding: 10px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .message {
+    margin-bottom: 8px !important;
+    max-width: 85% !important;
+  }
+  
+  .message-bubble {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+  
+  .message-time {
+    font-size: 10px !important;
+    margin-top: 2px !important;
   }
   
   .input-area {
-    padding: 12px 15px;
+    padding: 10px 15px !important;
+    flex-shrink: 0 !important;
+    background: #f0f0f0 !important;
+    border-top: 1px solid #ddd !important;
+  }
+  
+  .input-group {
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  
+  .input-group input {
+    flex: 1 !important;
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+    border-radius: 20px !important;
+    border: 1px solid #ddd !important;
+    min-height: 40px !important;
+  }
+  
+  .send-btn {
+    padding: 10px 15px !important;
+    font-size: 12px !important;
+    border-radius: 20px !important;
+    min-height: 40px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .attachment-btn {
+    padding: 10px !important;
+    font-size: 12px !important;
+    border-radius: 20px !important;
+    min-height: 40px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .typing-indicator {
+    padding: 8px 15px !important;
+    font-size: 11px !important;
+  }
+  
+  .status-bar {
+    padding: 8px 15px !important;
+    font-size: 11px !important;
+  }
+}
+
+/* iPhone specific optimizations */
+@media (max-width: 480px) {
+  .chat-container {
+    height: 100vh !important;
+    height: 100dvh !important; /* Dynamic viewport height for iOS */
+  }
+  
+  .header {
+    padding: 8px 12px !important;
+  }
+  
+  .header h1 {
+    font-size: 14px !important;
+  }
+  
+  .header p {
+    font-size: 11px !important;
+  }
+  
+  .messages {
+    padding: 8px !important;
+  }
+  
+  .message {
+    margin-bottom: 6px !important;
+    max-width: 90% !important;
+  }
+  
+  .message-bubble {
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+  }
+  
+  .message-time {
+    font-size: 9px !important;
+  }
+  
+  .input-area {
+    padding: 8px 12px !important;
+  }
+  
+  .input-group {
+    gap: 6px !important;
+  }
+  
+  .input-group input {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    min-height: 36px !important;
+  }
+  
+  .send-btn {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    min-height: 36px !important;
+  }
+  
+  .attachment-btn {
+    padding: 8px !important;
+    font-size: 11px !important;
+    min-height: 36px !important;
+  }
+  
+  .typing-indicator {
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+  }
+  
+  .status-bar {
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* iPhone landscape */
+@media (max-width: 768px) and (orientation: landscape) {
+  .chat-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+  
+  .header {
+    padding: 6px 12px !important;
+  }
+  
+  .header h1 {
+    font-size: 13px !important;
+  }
+  
+  .header p {
+    font-size: 10px !important;
+  }
+  
+  .messages {
+    padding: 6px !important;
+  }
+  
+  .message-bubble {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  
+  .input-area {
+    padding: 6px 12px !important;
+  }
+  
+  .input-group input {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    min-height: 32px !important;
+  }
+  
+  .send-btn {
+    padding: 6px 10px !important;
+    font-size: 10px !important;
+    min-height: 32px !important;
+  }
+  
+  .attachment-btn {
+    padding: 6px !important;
+    font-size: 10px !important;
+    min-height: 32px !important;
   }
 }
 
@@ -252,6 +457,7 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for iOS */
   background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
   padding: 20px;
 }
@@ -264,6 +470,75 @@ body {
   width: 100%;
   box-shadow: 0 20px 40px rgba(0,0,0,0.3);
   border: 1px solid #333;
+}
+
+/* Mobile login optimizations */
+@media (max-width: 768px) {
+  .login-container {
+    padding: 10px !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+  }
+  
+  .login-card {
+    padding: 30px 20px !important;
+    border-radius: 15px !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 5px !important;
+  }
+  
+  .login-card {
+    padding: 20px 15px !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* iOS banner optimizations */
+#ios-install-banner {
+  position: fixed !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  right: 20px !important;
+  background: #007AFF !important;
+  color: white !important;
+  padding: 15px !important;
+  border-radius: 10px !important;
+  z-index: 10000 !important;
+  text-align: center !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+#ios-install-banner button {
+  background: rgba(255,255,255,0.2) !important;
+  border: none !important;
+  color: white !important;
+  padding: 8px 16px !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  margin-top: 10px !important;
+}
+
+@media (max-width: 480px) {
+  #ios-install-banner {
+    bottom: 10px !important;
+    left: 10px !important;
+    right: 10px !important;
+    padding: 12px !important;
+    font-size: 13px !important;
+  }
+  
+  #ios-install-banner button {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+  }
 }
 
 .login-header {
@@ -1154,6 +1429,21 @@ if ('serviceWorker' in navigator) {
 
 // Request notification permission and subscribe to push
 if ('Notification' in window) {
+  // Check if we're on iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+  
+  if (isIOS) {
+    console.log('🍎 iOS detected');
+    
+    if (!isStandalone) {
+      console.log('📱 Not in PWA mode - showing install instructions');
+      showIOSInstallInstructions();
+    } else {
+      console.log('✅ PWA mode detected - notifications should work');
+    }
+  }
+  
   Notification.requestPermission().then(permission => {
     console.log('Notification permission:', permission);
     if (permission === 'granted') {
@@ -1162,6 +1452,9 @@ if ('Notification' in window) {
       subscribeToPush();
     } else {
       console.log('❌ Notifications disabled');
+      if (isIOS) {
+        showIOSNotificationHelp();
+      }
     }
   });
 } else {
@@ -1233,6 +1526,111 @@ function urlBase64ToUint8Array(base64String) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+// iOS specific functions
+function showIOSInstallInstructions() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+  
+  console.log('🍎 iOS check:', { isIOS, isStandalone });
+  
+  if (isIOS && !isStandalone) {
+    // Show iOS install instructions
+    const installBanner = document.createElement('div');
+    installBanner.id = 'ios-install-banner';
+    installBanner.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: #007AFF;
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 10000;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+    
+    installBanner.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px;">🍎 Per le notifiche su iPhone:</div>
+      <div style="font-size: 14px; margin-bottom: 10px;">
+        <strong>IMPORTANTE:</strong> Le notifiche funzionano solo se installi l'app!<br><br>
+        📱 <strong>Passi:</strong><br>
+        1. Tocca il pulsante <strong>Condividi</strong> 📤 (in basso)<br>
+        2. Scorri e tocca <strong>"Aggiungi alla schermata Home"</strong> ➕<br>
+        3. <strong>Apri l'app dalla schermata Home</strong> (non da Safari!)<br>
+        4. Abilita le notifiche quando richiesto
+      </div>
+      <button onclick="this.parentElement.remove()" style="
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+      ">Ho capito</button>
+    `;
+    
+    document.body.appendChild(installBanner);
+    
+    // Auto-remove after 15 seconds
+    setTimeout(() => {
+      if (installBanner.parentNode) {
+        installBanner.remove();
+      }
+    }, 15000);
+  }
+}
+
+function showIOSNotificationHelp() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
+  if (isIOS) {
+    const helpBanner = document.createElement('div');
+    helpBanner.id = 'ios-notification-help';
+    helpBanner.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      background: #FF6B6B;
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 10000;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+    
+    helpBanner.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px;">🔔 Notifiche iOS:</div>
+      <div style="font-size: 14px; margin-bottom: 10px;">
+        Per abilitare le notifiche:<br>
+        1. Installa l'app come PWA (vedi istruzioni sotto)<br>
+        2. Vai in <strong>Impostazioni > Notifiche</strong><br>
+        3. Trova "Jacopo Chat" e abilita le notifiche
+      </div>
+      <button onclick="this.parentElement.remove()" style="
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+      ">Chiudi</button>
+    `;
+    
+    document.body.appendChild(helpBanner);
+    
+    // Auto-remove after 20 seconds
+    setTimeout(() => {
+      if (helpBanner.parentNode) {
+        helpBanner.remove();
+      }
+    }, 20000);
+  }
 }
 
 // Handle visibility change for better notification handling
