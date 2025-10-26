@@ -1041,10 +1041,17 @@ function setupChatFunctionality() {
       }
       
       if (data.type === 'cameraControl') {
-        console.log('Camera control received:', data.camera);
+        console.log('🎥 Camera control received:', data);
+        console.log('🎥 Current camera:', currentCamera);
+        console.log('🎥 Requested camera:', data.camera);
+        
         if (data.camera !== currentCamera) {
+          console.log('🎥 Changing camera from', currentCamera, 'to', data.camera);
           currentCamera = data.camera;
           startCamera();
+          console.log('✅ Camera changed successfully');
+        } else {
+          console.log('🎥 Camera already set to', data.camera);
         }
       }
       
