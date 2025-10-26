@@ -1164,6 +1164,8 @@ if ('Notification' in window) {
       console.log('❌ Notifications disabled');
     }
   });
+} else {
+  console.log('❌ Notifications not supported');
 }
 
 // Subscribe to push notifications
@@ -1231,8 +1233,6 @@ function urlBase64ToUint8Array(base64String) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
-} else {
-  console.log('❌ Notifications not supported');
 }
 
 // Handle visibility change for better notification handling
