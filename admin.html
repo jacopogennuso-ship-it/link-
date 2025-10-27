@@ -1924,13 +1924,31 @@ function initializeWebSocket() {
         const attachmentEl = document.createElement('div');
         attachmentEl.className = 'attachment';
         
-        if (attachment.type === 'image') {
-          attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine" style="max-width: 200px; border-radius: 8px;">`;
-        } else {
+        // Check if it's an image by type or URL extension
+        const isImage = attachment.type === 'image' || 
+                       (attachment.url && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(attachment.url));
+        
+        if (isImage) {
+          // For images, show only the image without name/URL
           attachmentEl.innerHTML = `
-            <div style="background: #f0f0f0; padding: 5px; border-radius: 4px;">
+            <img src="${attachment.url}" 
+                 alt="Immagine allegata" 
+                 class="attachment-image"
+                 onclick="window.open('${attachment.url}', '_blank')"
+                 style="max-width: 200px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          `;
+        } else {
+          // For other files, show name and download link
+          attachmentEl.innerHTML = `
+            <div class="attachment-file" style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: flex; align-items: center; gap: 8px;">
               <span>📎</span>
-              <span>${attachment.name}</span>
+              <span style="flex: 1;">${attachment.name || 'File allegato'}</span>
+              <a href="${attachment.url}" 
+                 target="_blank" 
+                 style="color: #007bff; text-decoration: none; font-size: 12px; padding: 2px 6px; background: #007bff; color: white; border-radius: 3px;"
+                 download="${attachment.name || 'file'}">
+                Scarica
+              </a>
             </div>
           `;
         }
@@ -2011,13 +2029,31 @@ function initializeWebSocket() {
         const attachmentEl = document.createElement('div');
         attachmentEl.className = 'attachment';
         
-        if (attachment.type === 'image') {
-          attachmentEl.innerHTML = `<img src="${attachment.url}" alt="Immagine" style="max-width: 200px; border-radius: 8px;">`;
-        } else {
+        // Check if it's an image by type or URL extension
+        const isImage = attachment.type === 'image' || 
+                       (attachment.url && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(attachment.url));
+        
+        if (isImage) {
+          // For images, show only the image without name/URL
           attachmentEl.innerHTML = `
-            <div style="background: #f0f0f0; padding: 5px; border-radius: 4px;">
+            <img src="${attachment.url}" 
+                 alt="Immagine allegata" 
+                 class="attachment-image"
+                 onclick="window.open('${attachment.url}', '_blank')"
+                 style="max-width: 200px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          `;
+        } else {
+          // For other files, show name and download link
+          attachmentEl.innerHTML = `
+            <div class="attachment-file" style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: flex; align-items: center; gap: 8px;">
               <span>📎</span>
-              <span>${attachment.name}</span>
+              <span style="flex: 1;">${attachment.name || 'File allegato'}</span>
+              <a href="${attachment.url}" 
+                 target="_blank" 
+                 style="color: #007bff; text-decoration: none; font-size: 12px; padding: 2px 6px; background: #007bff; color: white; border-radius: 3px;"
+                 download="${attachment.name || 'file'}">
+                Scarica
+              </a>
             </div>
           `;
         }
