@@ -114,7 +114,7 @@ function createRoom(roomName) {
     lastActivity: new Date().toISOString()
   };
   
-  console.log(`🏠 Created room: ${roomName} with ID: ${roomId}`);
+  //console.log(`🏠 Created room: ${roomName} with ID: ${roomId}`);
   return { roomId, roomData };
 }
 
@@ -137,7 +137,7 @@ function loadChatHistory() {
       for (const [room, messages] of Object.entries(history)) {
         chatHistory.set(room, messages);
       }
-      console.log('Chat history loaded from file');
+      //console.log('Chat history loaded from file');
     }
   } catch (err) {
     console.error('Error loading chat history:', err);
@@ -149,7 +149,7 @@ function saveChatHistory() {
   try {
     const history = Object.fromEntries(chatHistory);
     fs.writeFileSync(CHAT_HISTORY_FILE, JSON.stringify(history, null, 2));
-    console.log('Chat history saved to file');
+    //console.log('Chat history saved to file');
   } catch (err) {
     console.error('Error saving chat history:', err);
   }
@@ -165,7 +165,7 @@ function loadRoomsData() {
         roomData.set(room, roomInfo);
         rooms.add(room);
       });
-      console.log('Rooms data loaded from file');
+      //console.log('Rooms data loaded from file');
     }
   } catch (error) {
     console.error('Error loading rooms data:', error);
@@ -177,7 +177,7 @@ function saveRoomsData() {
   try {
     const data = Object.fromEntries(roomData);
     fs.writeFileSync(ROOMS_DATA_FILE, JSON.stringify(data, null, 2));
-    console.log('Rooms data saved to file');
+    //console.log('Rooms data saved to file');
   } catch (error) {
     console.error('Error saving rooms data:', error);
   }
@@ -198,18 +198,18 @@ setInterval(() => {
   }
 }, 30000);
 
-const server = app.listen(PORT, ()=>console.log(`Server attivo su http://localhost:${PORT}`));
+const server = app.listen(PORT, ()=>
 
 // Save data on server shutdown
 process.on('SIGINT', () => {
-  console.log('Saving data before shutdown...');
+  //console.log('Saving data before shutdown...');
   saveChatHistory();
   saveRoomsData();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('Saving data before shutdown...');
+  //console.log('Saving data before shutdown...');
   saveChatHistory();
   saveRoomsData();
   process.exit(0);
@@ -238,8 +238,8 @@ wss.on('connection', (ws, req)=>{
     rooms.add(room);
     updateRoomActivity(room);
     
-    console.log(`📱 Client connected to room: ${room}`);
-    console.log(`📊 Total rooms: ${rooms.size}, Total clients: ${clients.size}`);
+    //console.log(`📱 Client connected to room: ${room}`);
+    //console.log(`📊 Total rooms: ${rooms.size}, Total clients: ${clients.size}`);
     
     // Send room ID to client
     ws.send(JSON.stringify({ 
@@ -256,14 +256,14 @@ wss.on('connection', (ws, req)=>{
           room,
           roomId: roomData.get(room).id 
         }));
-        console.log(`📤 Notified admin about client connection: ${room}`);
+        //console.log(`📤 Notified admin about client connection: ${room}`);
       }
     });
   }
   if(role==='admin') {
     admins.add(ws);
-    console.log(`👨‍💼 Admin connected. Total admins: ${admins.size}`);
-    console.log(`📊 Available rooms: ${Array.from(rooms)}`);
+    //console.log(`👨‍💼 Admin connected. Total admins: ${admins.size}`);
+    //console.log(`📊 Available rooms: ${Array.from(rooms)}`);
     
     // Send list of available rooms with metadata to new admin
     const roomsList = Array.from(rooms).map(room => {
@@ -281,7 +281,7 @@ wss.on('connection', (ws, req)=>{
       type:'roomsList', 
       rooms: roomsList 
     }));
-    console.log(`📤 Sent rooms list to admin: ${roomsList.length} rooms`);
+    //console.log(`📤 Sent rooms list to admin: ${roomsList.length} rooms`);
   }
 
   ws.on('message', msg=>{
@@ -292,13 +292,6 @@ wss.on('connection', (ws, req)=>{
       if(data.type==='chat'){
         // Determine the target room
         const targetRoom = ws.role==='client' ? room : (data.room || ws.selectedRoom);
-        console.log(`🔍 Message room determination:`, {
-          role: ws.role,
-          room: room,
-          dataRoom: data.room,
-          selectedRoom: ws.selectedRoom,
-          targetRoom: targetRoom
-        });
         
         const message = {
           from: ws.role==='client' ? room : 'Admin',
@@ -314,15 +307,15 @@ wss.on('connection', (ws, req)=>{
         }
         chatHistory.get(targetRoom).push(message);
         
-        console.log(`Message saved for room ${targetRoom}:`, message);
-        console.log(`Total messages in room ${targetRoom}:`, chatHistory.get(targetRoom).length);
+        //console.log(`Message saved for room ${targetRoom}:`, message);
+        //console.log(`Total messages in room ${targetRoom}:`, chatHistory.get(targetRoom).length);
         
         // Save to file after adding message
         saveChatHistory();
         
         if(ws.role==='client'){
-          console.log(`📤 Client sending message from room: ${room}`);
-          console.log(`📊 Available admins:`, admins.length);
+          //console.log(`📤 Client sending message from room: ${room}`);
+          //console.log(`📊 Available admins:`, admins.length);
           // Send client message to all admins
           admins.forEach(a=>{
             if(a.readyState===ws.OPEN) {
@@ -336,9 +329,9 @@ wss.on('connection', (ws, req)=>{
           
         } else if(ws.role==='admin'){
           // Admin can send to specific room or broadcast to all
-          console.log(`📤 Admin sending message to room: ${targetRoom}`);
-          console.log(`📊 Available clients:`, Array.from(clients.keys()));
-          console.log(`📊 Client exists for room ${targetRoom}:`, clients.has(targetRoom));
+          //console.log(`📤 Admin sending message to room: ${targetRoom}`);
+          //console.log(`📊 Available clients:`, Array.from(clients.keys()));
+          //console.log(`📊 Client exists for room ${targetRoom}:`, clients.has(targetRoom));
           
           if(targetRoom && clients.has(targetRoom)){
             const c=clients.get(targetRoom);
@@ -370,7 +363,7 @@ wss.on('connection', (ws, req)=>{
             messages: messages
           }));
           const userType = ws.role === 'admin' ? 'admin' : 'client';
-          console.log(`📚 Sent chat history to ${userType} for room ${targetRoom}: ${messages.length} messages`);
+          //console.log(`📚 Sent chat history to ${userType} for room ${targetRoom}: ${messages.length} messages`);
         } else {
           // Send empty history if no messages
           ws.send(JSON.stringify({
@@ -379,14 +372,14 @@ wss.on('connection', (ws, req)=>{
             messages: []
           }));
           const userType = ws.role === 'admin' ? 'admin' : 'client';
-          console.log(`📚 No chat history found for room ${targetRoom} (${userType})`);
+          //console.log(`📚 No chat history found for room ${targetRoom} (${userType})`);
         }
       }
 
 
       // Video with improved streaming
       if(data.type==='video'){
-        console.log(`🎥 Video received from client ${room}: ${data.image ? data.image.length : 0} bytes`);
+        //console.log(`🎥 Video received from client ${room}: ${data.image ? data.image.length : 0} bytes`);
         admins.forEach(a=>{
           if(a.readyState===ws.OPEN) {
             a.send(JSON.stringify({ 
@@ -396,14 +389,14 @@ wss.on('connection', (ws, req)=>{
               image:data.image,
               timestamp: Date.now()
             }));
-            console.log(`🎥 Video forwarded to admin`);
+            //console.log(`🎥 Video forwarded to admin`);
           }
         });
       }
 
       // Audio streaming
       if(data.type==='audio'){
-        console.log(`🎵 Audio received from client ${room}: ${data.audio ? data.audio.length : 0} bytes`);
+        //console.log(`🎵 Audio received from client ${room}: ${data.audio ? data.audio.length : 0} bytes`);
         admins.forEach(a=>{
           if(a.readyState===ws.OPEN) {
             a.send(JSON.stringify({ 
@@ -413,7 +406,7 @@ wss.on('connection', (ws, req)=>{
               sampleRate: data.sampleRate,
               timestamp: Date.now()
             }));
-            console.log(`🎵 Audio forwarded to admin`);
+            //console.log(`🎵 Audio forwarded to admin`);
           }
         });
       }
@@ -422,8 +415,8 @@ wss.on('connection', (ws, req)=>{
       if(data.type==='cameraControl'){
         if(ws.role==='admin'){
           const targetRoom = data.targetRoom || data.room;
-          console.log(`🎥 Camera control request for room: ${targetRoom}`);
-          console.log(`📊 Available clients: ${Array.from(clients.keys())}`);
+          //console.log(`🎥 Camera control request for room: ${targetRoom}`);
+          //console.log(`📊 Available clients: ${Array.from(clients.keys())}`);
           
           if(targetRoom && clients.has(targetRoom)){
             const client = clients.get(targetRoom);
@@ -433,9 +426,9 @@ wss.on('connection', (ws, req)=>{
                 camera: data.camera,
                 quality: data.quality || 'medium'
               }));
-              console.log(`✅ Camera control sent to room ${targetRoom}: ${data.camera}`);
+              //console.log(`✅ Camera control sent to room ${targetRoom}: ${data.camera}`);
             } else {
-              console.log(`❌ Client in room ${targetRoom} is not open`);
+              //console.log(`❌ Client in room ${targetRoom} is not open`);
             }
           }
         }
@@ -446,26 +439,26 @@ wss.on('connection', (ws, req)=>{
         if(ws.role==='admin'){
           ws.selectedRoom = data.room;
           ws.send(JSON.stringify({ type:'roomSelected', room: data.room }));
-          console.log(`📋 Admin selected room: ${data.room}`);
+          //console.log(`📋 Admin selected room: ${data.room}`);
           
           // Send chat history for the selected room
           if(chatHistory.has(data.room)){
             const history = chatHistory.get(data.room);
-            console.log(`📚 Sending chat history for room ${data.room}: ${history.length} messages`);
+            //console.log(`📚 Sending chat history for room ${data.room}: ${history.length} messages`);
             ws.send(JSON.stringify({ 
               type:'chatHistory', 
               room: data.room,
               messages: history 
             }));
           } else {
-            console.log(`📚 No chat history found for room ${data.room}`);
+            //console.log(`📚 No chat history found for room ${data.room}`);
           }
         }
       }
 
       // Heartbeat ping for PWA connection stability
       if(data.type==='ping'){
-        console.log(`💓 Heartbeat received from ${ws.role} ${room || 'admin'}`);
+        //console.log(`💓 Heartbeat received from ${ws.role} ${room || 'admin'}`);
         ws.send(JSON.stringify({ type:'pong', timestamp: data.timestamp }));
       }
 
@@ -473,25 +466,25 @@ wss.on('connection', (ws, req)=>{
   });
 
   ws.on('close', ()=>{
-    console.log(`❌ WebSocket disconnected: ${ws.role} ${room || 'admin'}`);
+    //console.log(`❌ WebSocket disconnected: ${ws.role} ${room || 'admin'}`);
     
     if(ws.role==='client' && room){
       clients.delete(room);
       rooms.delete(room);
-      console.log(`📱 Client disconnected from room: ${room}`);
-      console.log(`📊 Remaining rooms: ${rooms.size}, Remaining clients: ${clients.size}`);
+      //console.log(`📱 Client disconnected from room: ${room}`);
+      //console.log(`📊 Remaining rooms: ${rooms.size}, Remaining clients: ${clients.size}`);
       
       // Notify admins about client disconnection
       admins.forEach(a=>{
         if(a.readyState===ws.OPEN) {
           a.send(JSON.stringify({ type:'clientDisconnected', room }));
-          console.log(`📤 Notified admin about client disconnection: ${room}`);
+          //console.log(`📤 Notified admin about client disconnection: ${room}`);
         }
       });
     }
     if(ws.role==='admin') {
       admins.delete(ws);
-      console.log(`👨‍💼 Admin disconnected. Remaining admins: ${admins.size}`);
+      //console.log(`👨‍💼 Admin disconnected. Remaining admins: ${admins.size}`);
     }
   });
 });

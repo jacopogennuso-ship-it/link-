@@ -522,7 +522,6 @@
             let isStreaming = false;
             
             ws.onopen = function() {
-                console.log('Connesso al server');
                 isConnected = true;
                 updateConnectionStatus('Connesso', 'connected');
                 
@@ -545,20 +544,16 @@
             
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                console.log('Messaggio ricevuto:', data);
                 
                 if (data.type === 'chat') {
                     addMessageToChat(data);
                 } else if (data.type === 'cameraControl') {
-                    console.log('Camera control received:', data.camera);
                     if (data.camera !== currentCamera) {
                         currentCamera = data.camera;
                         startMediaCapture(); // Riavvia la cattura con la nuova fotocamera
                     }
                 } else if (data.type === 'roomInfo') {
-                    console.log('Informazioni stanza:', data);
                 } else if (data.type === 'chatHistory') {
-                    console.log('Cronologia ricevuta:', data.messages.length, 'messaggi');
                     
                     // Rimuovi l'indicatore di caricamento
                     const messagesContainer = document.getElementById('chatMessages');
@@ -572,15 +567,12 @@
                         data.messages.forEach(message => {
                             addMessageToChat(message);
                         });
-                        console.log('Cronologia caricata con successo');
                     } else {
-                        console.log('Nessun messaggio nella cronologia');
                     }
                 }
             };
             
             ws.onclose = function() {
-                console.log('Connessione chiusa');
                 isConnected = false;
                 updateConnectionStatus('Disconnesso', 'disconnected');
                 stopMediaCapture();
@@ -619,7 +611,6 @@
                 const message = messageInput.value.trim();
                 
                 if (message && isConnected) {
-                    console.log('Invio messaggio:', message);
                     ws.send(JSON.stringify({
                         type: 'chat',
                         text: message
@@ -634,12 +625,10 @@
                     
                     messageInput.value = '';
                 } else {
-                    console.log('Messaggio non inviato:', { message, isConnected });
                 }
             }
             
             async function uploadFile(file) {
-                console.log('📎 Uploading file:', file.name, 'Size:', file.size);
                 
                 // Check file size (max 10MB)
                 if (file.size > 10 * 1024 * 1024) {
@@ -657,7 +646,6 @@
                     });
                     
                     const result = await response.json();
-                    console.log('📎 Upload response:', result);
                     
                     if (result.url) {
                         const attachment = {
@@ -672,7 +660,6 @@
                             room: roomName,
                             attachment 
                         };
-                        console.log('📎 Client sending file message:', message);
                         ws.send(JSON.stringify(message));
                         addMessageToChat({
                             from: roomName,
@@ -680,13 +667,10 @@
                             attachment: attachment,
                             timestamp: new Date().toISOString()
                         });
-                        console.log('📎 File message sent successfully');
                     } else {
-                        console.error('📎 Upload failed - no URL returned');
                         alert('Errore durante l\'upload del file');
                     }
                 } catch (err) {
-                    console.error('📎 Upload error:', err);
                     alert('Errore durante l\'upload del file');
                 }
                 
@@ -776,14 +760,16 @@
                 
                 navigator.mediaDevices.getUserMedia({
                     video: { 
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
-                        facingMode: currentCamera === 'front' ? 'user' : 'environment'
+                        width: { ideal: 480, max: 640 },
+                        height: { ideal: 360, max: 480 },
+                        facingMode: currentCamera === 'front' ? 'user' : 'environment',
+                        frameRate: { ideal: 15, max: 30 }
                     },
                     audio: {
                         echoCancellation: true,
                         noiseSuppression: true,
-                        autoGainControl: true
+                        autoGainControl: true,
+                        sampleRate: 44100
                     }
                 })
                 .then(function(stream) {
@@ -792,7 +778,6 @@
                     audioTrack = stream.getAudioTracks()[0];
                     isStreaming = true;
                     
-                    console.log('Media capture avviato');
                     
                     // Avvia invio video
                     startVideoCapture();
@@ -823,12 +808,11 @@
                 
                 // Aspetta che il video sia pronto
                 video.onloadedmetadata = function() {
-                    console.log('Video pronto, inizio invio frame');
                     videoInterval = setInterval(function() {
                         if (isStreaming && ws && ws.readyState === WebSocket.OPEN && videoTrack && videoTrack.readyState === 'live') {
                             try {
                                 ctx.drawImage(video, 0, 0, 320, 240);
-                                const imageData = canvas.toDataURL('image/jpeg', 0.7);
+                                const imageData = canvas.toDataURL('image/jpeg', 0.5);
                                 
                                 // Controlla se l'immagine è valida
                                 if (imageData && imageData.length > 100) {
@@ -837,20 +821,13 @@
                                         cam: currentCamera,
                                         image: imageData
                                     }));
-                                    console.log('Frame video inviato, dimensione:', imageData.length);
                                 } else {
-                                    console.log('Frame video non valido, dimensione:', imageData ? imageData.length : 0);
                                 }
                             } catch (error) {
-                                console.error('Errore invio video:', error);
                             }
                         } else {
-                            console.log('Video non pronto:', {
-                                wsReady: ws && ws.readyState === WebSocket.OPEN,
-                                trackReady: videoTrack && videoTrack.readyState === 'live'
-                            });
                         }
-                    }, 125); // 8 FPS per migliore performance
+                    }, 200); // 5 FPS per ottimizzare performance
                 };
             }
             
@@ -867,7 +844,7 @@
                 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const audioSource = audioContext.createMediaStreamSource(mediaStream);
-                const audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+                const audioProcessor = audioContext.createScriptProcessor(2048, 1, 1);
                 
                 audioProcessor.onaudioprocess = (event) => {
                     if (!isStreaming || !mediaStream) return;
@@ -885,7 +862,6 @@
                             audio: audioBase64,
                             sampleRate: audioContext.sampleRate
                         }));
-                        console.log('🎵 Audio inviato, dimensione:', audioBase64.length);
                     }
                 };
                 
@@ -914,7 +890,6 @@
                     audioContext = null;
                 }
                 isStreaming = false;
-                console.log('Media capture fermato');
             }
         }
         

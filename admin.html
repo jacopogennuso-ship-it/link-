@@ -1481,45 +1481,45 @@ function handleAdminLogin() {
   const username = adminUsername.value.trim();
   const password = adminPassword.value.trim();
   
-  console.log('🔐 Login attempt:', { username, password });
-  console.log('🔐 Expected credentials:', ADMIN_CREDENTIALS);
+  //console.log('🔐 Login attempt:', { username, password });
+  //console.log('🔐 Expected credentials:', ADMIN_CREDENTIALS);
   
   if (!username || !password) {
-    console.log('❌ Missing username or password');
+    //console.log('❌ Missing username or password');
     showLoginError('Inserisci username e password');
     return;
   }
   
   if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-    console.log('✅ Login successful');
+    //console.log('✅ Login successful');
     // Save login state to localStorage
     localStorage.setItem('adminLoggedIn', 'true');
     localStorage.setItem('adminLoginTime', Date.now().toString());
     
     // Login successful
-    console.log('🔍 Hiding login container, showing dashboard');
-    console.log('🔍 adminLoginContainer:', adminLoginContainer);
-    console.log('🔍 adminDashboard:', adminDashboard);
+    //console.log('🔍 Hiding login container, showing dashboard');
+    //console.log('🔍 adminLoginContainer:', adminLoginContainer);
+    //console.log('🔍 adminDashboard:', adminDashboard);
     
     if (adminLoginContainer) {
       adminLoginContainer.style.display = 'none';
-      console.log('✅ Login container hidden');
+      //console.log('✅ Login container hidden');
     } else {
-      console.log('❌ adminLoginContainer not found');
+      //console.log('❌ adminLoginContainer not found');
     }
     
     if (adminDashboard) {
       adminDashboard.style.display = 'flex';
-      console.log('✅ Dashboard shown');
+      //console.log('✅ Dashboard shown');
     } else {
-      console.log('❌ adminDashboard not found');
+      //console.log('❌ adminDashboard not found');
     }
     
   // Initialize WebSocket connection
   initializeWebSocket();
   
   } else {
-    console.log('❌ Invalid credentials');
+    //console.log('❌ Invalid credentials');
     showLoginError('Credenziali non valide');
   }
 }
@@ -1559,7 +1559,7 @@ function checkAdminSession() {
   const roomIdFromUrl = urlParams.get('roomId');
   
   if (roomFromUrl && roomIdFromUrl) {
-    console.log('🏠 Room parameters found, auto-login for room access');
+    //console.log('🏠 Room parameters found, auto-login for room access');
     // Auto-login for room access
     adminLoginContainer.style.display = 'none';
     adminDashboard.style.display = 'flex';
@@ -1577,17 +1577,17 @@ function checkAdminSession() {
   const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
   const loginTime = localStorage.getItem('adminLoginTime');
   
-  console.log('🔍 Checking admin session:', { isLoggedIn, loginTime });
+  //console.log('🔍 Checking admin session:', { isLoggedIn, loginTime });
   
   if (isLoggedIn && loginTime) {
     // Check if session is not older than 24 hours
     const sessionAge = Date.now() - parseInt(loginTime);
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     
-    console.log('🔍 Session age:', sessionAge, 'Max age:', maxAge);
+    //console.log('🔍 Session age:', sessionAge, 'Max age:', maxAge);
     
     if (sessionAge < maxAge) {
-      console.log('✅ Session is valid, auto-login');
+      //console.log('✅ Session is valid, auto-login');
       // Session is valid, auto-login
       adminLoginContainer.style.display = 'none';
       adminDashboard.style.display = 'flex';
@@ -1602,14 +1602,14 @@ function checkAdminSession() {
       
       return true;
     } else {
-      console.log('❌ Session expired, clearing');
+      //console.log('❌ Session expired, clearing');
       // Session expired, clear it
       localStorage.removeItem('adminLoggedIn');
       localStorage.removeItem('adminLoginTime');
     }
   }
   
-  console.log('❌ No valid session found');
+  //console.log('❌ No valid session found');
   return false;
 }
 
@@ -1620,13 +1620,13 @@ function initializeWebSocket() {
   ws.addEventListener('open', () => {
     connectionStatus.textContent = 'Connesso';
     connectionStatus.style.color = '#25d366';
-    console.log('✅ Admin WebSocket connected');
+    //console.log('✅ Admin WebSocket connected');
     
     // Send heartbeat to keep connection alive
     setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-        console.log('💓 Admin heartbeat sent');
+        //console.log('💓 Admin heartbeat sent');
       }
     }, 30000);
     
@@ -1647,7 +1647,7 @@ function initializeWebSocket() {
   const roomIdFromUrl = urlParams.get('roomId');
   
   if (roomFromUrl && roomIdFromUrl) {
-    console.log('🏠 Room from URL:', roomFromUrl, 'ID:', roomIdFromUrl);
+    //console.log('🏠 Room from URL:', roomFromUrl, 'ID:', roomIdFromUrl);
     // Store room info for when admin connects
     localStorage.setItem('pendingRoom', JSON.stringify({
       room: roomFromUrl,
@@ -1659,14 +1659,14 @@ function initializeWebSocket() {
   ws.addEventListener('close', (event) => {
     connectionStatus.textContent = 'Disconnesso';
     connectionStatus.style.color = '#ff4444';
-    console.log('❌ Admin WebSocket disconnected:', event.code, event.reason);
+    //console.log('❌ Admin WebSocket disconnected:', event.code, event.reason);
     
     // Stop heartbeat
     stopAdminHeartbeat();
     
     // Attempt to reconnect after 3 seconds
     setTimeout(() => {
-      console.log('🔄 Attempting admin reconnection...');
+      //console.log('🔄 Attempting admin reconnection...');
       initializeWebSocket();
     }, 3000);
   });
@@ -1681,10 +1681,10 @@ function initializeWebSocket() {
   ws.addEventListener('message', e => {
     try {
       const data = JSON.parse(e.data);
-      console.log('📨 Admin WebSocket message received:', data.type, data.room || 'no room');
+      //console.log('📨 Admin WebSocket message received:', data.type, data.room || 'no room');
     
       if (data.type === 'roomsList') {
-        console.log('📋 Received rooms list:', data.rooms);
+        //console.log('📋 Received rooms list:', data.rooms);
         updateRoomsList(data.rooms);
       }
       
@@ -1697,45 +1697,45 @@ function initializeWebSocket() {
       }
       
       if (data.type === 'chat') {
-        console.log('📨 Admin received chat message:', data);
+        //console.log('📨 Admin received chat message:', data);
         // Only show messages for the selected room
         if (selectedRoom === data.room) {
           addMessage(data.from, data.text, false, data.attachment, data.timestamp);
         } else {
-          console.log(`📨 Message from ${data.from} in room ${data.room} but selected room is ${selectedRoom}`);
+          //console.log(`📨 Message from ${data.from} in room ${data.room} but selected room is ${selectedRoom}`);
         }
       }
       
       if (data.type === 'video') {
-        console.log('🎥 Admin received video data:', data.room, 'selected:', selectedRoom, 'bytes:', data.image ? data.image.length : 0);
+        //console.log('🎥 Admin received video data:', data.room, 'selected:', selectedRoom, 'bytes:', data.image ? data.image.length : 0);
         if (selectedRoom === data.room) {
           updateVideoStream(data.cam, data.image);
         } else {
-          console.log('🎥 Video from room', data.room, 'but selected room is', selectedRoom);
+          //console.log('🎥 Video from room', data.room, 'but selected room is', selectedRoom);
         }
       }
       
       if (data.type === 'audio') {
-        console.log('🎵 Admin received audio data:', data.room, 'selected:', selectedRoom, 'bytes:', data.audio ? data.audio.length : 0);
+        //console.log('🎵 Admin received audio data:', data.room, 'selected:', selectedRoom, 'bytes:', data.audio ? data.audio.length : 0);
         if (selectedRoom === data.room) {
           updateAudioStream(data.audio, data.sampleRate);
         } else {
-          console.log('🎵 Audio from room', data.room, 'but selected room is', selectedRoom);
+          //console.log('🎵 Audio from room', data.room, 'but selected room is', selectedRoom);
         }
       }
       
       if (data.type === 'chatHistory') {
-        console.log('📚 Admin received chat history:', data);
+        //console.log('📚 Admin received chat history:', data);
         if (selectedRoom === data.room) {
-          console.log(`📚 Loading chat history for room ${data.room}: ${data.messages.length} messages`);
+          //console.log(`📚 Loading chat history for room ${data.room}: ${data.messages.length} messages`);
           loadChatHistory(data.messages);
         } else {
-          console.log(`📚 Chat history for room ${data.room} but selected room is ${selectedRoom}`);
+          //console.log(`📚 Chat history for room ${data.room} but selected room is ${selectedRoom}`);
         }
       }
       
       if (data.type === 'pong') {
-        console.log('💓 Admin pong received from server');
+        //console.log('💓 Admin pong received from server');
       }
       
     } catch (err) {
@@ -1751,7 +1751,7 @@ function initializeWebSocket() {
   let unreadMessages = 0;
   
   function openChatFullscreen() {
-    console.log('🔍 Opening simple chat for room:', selectedRoom);
+    //console.log('🔍 Opening simple chat for room:', selectedRoom);
     
     const chatPopup = document.createElement('div');
     chatPopup.className = 'chat-fullscreen';
@@ -1780,7 +1780,7 @@ function initializeWebSocket() {
     const fullscreenFileInput = document.getElementById('fullscreenFileInput');
     if (fullscreenFileInput) {
       fullscreenFileInput.addEventListener('change', handleFullscreenFileUpload);
-      console.log('📎 Fullscreen file input setup complete');
+      //console.log('📎 Fullscreen file input setup complete');
     }
     
     // Focus on input
@@ -1799,7 +1799,7 @@ function initializeWebSocket() {
   }
 
   function closeChatFullscreen() {
-    console.log('❌ Closing chat');
+    //console.log('❌ Closing chat');
     const chat = document.querySelector('.chat-fullscreen');
     if (chat) {
       chat.remove();
@@ -1807,7 +1807,7 @@ function initializeWebSocket() {
   }
 
   function openFullscreenFileInput() {
-    console.log('📎 Opening fullscreen file input');
+    //console.log('📎 Opening fullscreen file input');
     const fileInput = document.getElementById('fullscreenFileInput');
     if (fileInput) {
       fileInput.click();
@@ -1815,27 +1815,27 @@ function initializeWebSocket() {
   }
 
   async function handleFullscreenFileUpload(e) {
-    console.log('📎 Fullscreen file upload triggered');
+    //console.log('📎 Fullscreen file upload triggered');
     const file = e.target.files[0];
     if (!file) {
-      console.log('📎 No file selected');
+      //console.log('📎 No file selected');
       return;
     }
     
-    console.log('📎 Uploading file:', file.name, file.type, file.size);
+    //console.log('📎 Uploading file:', file.name, file.type, file.size);
     
     const formData = new FormData();
     formData.append('file', file);
     
     try {
-      console.log('📎 Sending file to server...');
+      //console.log('📎 Sending file to server...');
       const response = await fetch('/upload', {
         method: 'POST',
         body: formData
       });
       
       const result = await response.json();
-      console.log('📎 Upload response:', result);
+      //console.log('📎 Upload response:', result);
       
       if (result.url) {
         const attachment = {
@@ -1850,10 +1850,10 @@ function initializeWebSocket() {
           room: selectedRoom,
           attachment 
         };
-        console.log('📎 Fullscreen sending file message:', message);
+        //console.log('📎 Fullscreen sending file message:', message);
         ws.send(JSON.stringify(message));
         addFullscreenMessage('Tu', `📎 ${file.name}`, true, attachment);
-        console.log('📎 Fullscreen file message sent successfully');
+        //console.log('📎 Fullscreen file message sent successfully');
       } else {
         console.error('📎 Upload failed - no URL returned');
       }
@@ -1869,7 +1869,7 @@ function initializeWebSocket() {
     const message = input.value.trim();
     
     if (message && selectedRoom) {
-      console.log('📤 Sending message:', message);
+      //console.log('📤 Sending message:', message);
       
       // Send via WebSocket
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1890,7 +1890,7 @@ function initializeWebSocket() {
     const message = input.value.trim();
     
     if (message && selectedRoom) {
-      console.log('📤 Sending fullscreen message:', message);
+      //console.log('📤 Sending fullscreen message:', message);
       
       // Send via WebSocket
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -2073,7 +2073,7 @@ function initializeWebSocket() {
 
   function loadChatMessages() {
     // This will be called when chat opens to load existing messages
-    console.log('📚 Loading chat messages for room:', selectedRoom);
+    //console.log('📚 Loading chat messages for room:', selectedRoom);
     
     if (selectedRoom && ws && ws.readyState === WebSocket.OPEN) {
       // Request chat history from server
@@ -2081,7 +2081,7 @@ function initializeWebSocket() {
         type: 'getChatHistory',
         room: selectedRoom
       }));
-      console.log('📚 Requested chat history for room:', selectedRoom);
+      //console.log('📚 Requested chat history for room:', selectedRoom);
     }
   }
 
@@ -2105,7 +2105,7 @@ function initializeWebSocket() {
   }
 
   // Test function availability
-  console.log('🔍 openChatFullscreen function available:', typeof openChatFullscreen === 'function');
+  //console.log('🔍 openChatFullscreen function available:', typeof openChatFullscreen === 'function');
   
   // Make function globally available
   window.openChatFullscreen = openChatFullscreen;
@@ -2117,13 +2117,13 @@ function initializeWebSocket() {
   window.handleFullscreenFileUpload = handleFullscreenFileUpload;
 
   function updateRoomsList(rooms) {
-    console.log('🔄 Updating rooms list:', rooms);
-    console.log('🔄 roomsList element:', roomsList);
+    //console.log('🔄 Updating rooms list:', rooms);
+    //console.log('🔄 roomsList element:', roomsList);
     
     roomsList.innerHTML = '';
     
     if (rooms.length === 0) {
-      console.log('📭 No rooms available');
+      //console.log('📭 No rooms available');
       roomsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Nessuna stanza attiva</div>';
       
       // Clear selected room if no rooms are available
@@ -2138,15 +2138,15 @@ function initializeWebSocket() {
       return;
     }
     
-    console.log(`📋 Adding ${rooms.length} rooms to list`);
+    //console.log(`📋 Adding ${rooms.length} rooms to list`);
     rooms.forEach(room => {
-      console.log('🏠 Adding room:', room);
+      //console.log('🏠 Adding room:', room);
       
       // Handle both string and object room formats
       const roomName = typeof room === 'string' ? room : room.name || room.room;
       const roomId = typeof room === 'object' ? room.roomId : room;
       
-      console.log('🏠 Room name:', roomName, 'Room ID:', roomId);
+      //console.log('🏠 Room name:', roomName, 'Room ID:', roomId);
       
       const roomEl = document.createElement('div');
       roomEl.className = 'room-item';
@@ -2161,16 +2161,16 @@ function initializeWebSocket() {
       roomsList.appendChild(roomEl);
     });
     
-    console.log('✅ Rooms list updated');
-    console.log('🔍 roomsList innerHTML:', roomsList.innerHTML);
-    console.log('🔍 roomsList children count:', roomsList.children.length);
+    //console.log('✅ Rooms list updated');
+    //console.log('🔍 roomsList innerHTML:', roomsList.innerHTML);
+    //console.log('🔍 roomsList children count:', roomsList.children.length);
   }
 
   function selectRoom(room) {
     // Check if room exists in the current rooms list
     const availableRooms = Array.from(document.querySelectorAll('.room-item')).map(item => item.dataset.room);
     if (!availableRooms.includes(room)) {
-      console.log(`❌ Room ${room} not found in available rooms:`, availableRooms);
+      //console.log(`❌ Room ${room} not found in available rooms:`, availableRooms);
       selectedRoom = null;
       selectedRoomTitle.textContent = 'Seleziona una stanza';
       cameraControls.style.display = 'none';
@@ -2261,7 +2261,7 @@ function initializeWebSocket() {
       if (!text) return;
       
       const message = { type: 'chat', text, room: selectedRoom };
-      console.log('Admin sending message:', message);
+      //console.log('Admin sending message:', message);
       ws.send(JSON.stringify(message));
       addMessage('Tu', text, true);
       chatInput.value = '';
@@ -2277,9 +2277,9 @@ function initializeWebSocket() {
     const adminFileInput = document.getElementById('adminFileInput');
     
     if (adminAttachBtn && adminFileInput) {
-      console.log('📎 Setting up admin file attachment');
+      //console.log('📎 Setting up admin file attachment');
       adminAttachBtn.addEventListener('click', () => {
-        console.log('📎 Admin attach button clicked');
+        //console.log('📎 Admin attach button clicked');
         adminFileInput.click();
       });
       adminFileInput.addEventListener('change', handleAdminFileUpload);
@@ -2296,7 +2296,7 @@ function initializeWebSocket() {
     
     if (stopCameraBtn) {
       stopCameraBtn.addEventListener('click', () => {
-        console.log('🎥 Stopping admin camera...');
+        //console.log('🎥 Stopping admin camera...');
         
         if (adminVideoStream) {
           adminVideoStream.getTracks().forEach(track => track.stop());
@@ -2311,33 +2311,33 @@ function initializeWebSocket() {
         statusElement.textContent = 'Offline';
         statusElement.style.color = '#6c757d';
         
-        console.log('✅ Admin camera stopped');
+        //console.log('✅ Admin camera stopped');
       });
     }
   }
   
   async function handleAdminFileUpload(e) {
-    console.log('📎 Admin file upload triggered');
+    //console.log('📎 Admin file upload triggered');
     const file = e.target.files[0];
     if (!file) {
-      console.log('📎 No file selected');
+      //console.log('📎 No file selected');
       return;
     }
     
-    console.log('📎 Uploading file:', file.name, file.type, file.size);
+    //console.log('📎 Uploading file:', file.name, file.type, file.size);
     
     const formData = new FormData();
     formData.append('file', file);
     
     try {
-      console.log('📎 Sending file to server...');
+      //console.log('📎 Sending file to server...');
       const response = await fetch('/upload', {
         method: 'POST',
         body: formData
       });
       
       const result = await response.json();
-      console.log('📎 Upload response:', result);
+      //console.log('📎 Upload response:', result);
       
       if (result.url) {
         const attachment = {
@@ -2352,10 +2352,10 @@ function initializeWebSocket() {
           room: selectedRoom,
           attachment 
         };
-        console.log('📎 Admin sending file message:', message);
+        //console.log('📎 Admin sending file message:', message);
         ws.send(JSON.stringify(message));
         addMessage('Tu', `📎 ${file.name}`, true, attachment);
-        console.log('📎 File message sent successfully');
+        //console.log('📎 File message sent successfully');
       } else {
         console.error('📎 Upload failed - no URL returned');
       }
@@ -2376,7 +2376,7 @@ function initializeWebSocket() {
   let lastCameraType = null; // Track camera type changes
 
   function resetVideoState() {
-    console.log('🎥 Resetting video state for new room/camera');
+    //console.log('🎥 Resetting video state for new room/camera');
     lastVideoUpdate = 0;
     lastValidFrame = null;
     frameSkipCount = 0;
@@ -2402,11 +2402,11 @@ function initializeWebSocket() {
   }
 
   function updateVideoStream(camera, imageData) {
-    console.log('🎥 Admin received video:', camera, imageData ? imageData.length : 0, 'bytes');
+    //console.log('🎥 Admin received video:', camera, imageData ? imageData.length : 0, 'bytes');
     
     // Check if camera type has changed
     if (lastCameraType && lastCameraType !== camera) {
-      console.log('🎥 Camera type changed from', lastCameraType, 'to', camera, '- resetting video state');
+      //console.log('🎥 Camera type changed from', lastCameraType, 'to', camera, '- resetting video state');
       resetVideoState();
     }
     lastCameraType = camera;
@@ -2417,10 +2417,6 @@ function initializeWebSocket() {
     const cameraIndicator = document.getElementById('clientCameraIndicator');
     
     if (!imgEl || !imageData) {
-      console.log('🎥 Image element not found or no image data:', {
-        imgEl: !!imgEl,
-        imageData: !!imageData
-      });
       return;
     }
 
@@ -2435,7 +2431,7 @@ function initializeWebSocket() {
     if (isSmallFrame) {
       frameSkipCount++;
       if (frameSkipCount < maxFrameSkip) {
-        console.log('🎥 Skipping small frame:', imageData.length, 'bytes (skip count:', frameSkipCount, ')');
+        //console.log('🎥 Skipping small frame:', imageData.length, 'bytes (skip count:', frameSkipCount, ')');
         return;
       }
     } else {
@@ -2445,13 +2441,13 @@ function initializeWebSocket() {
     
     // Rate limiting - don't update too frequently
     if (timeSinceLastUpdate < videoUpdateInterval) {
-      console.log('🎥 Rate limiting - skipping frame (too fast)');
+      //console.log('🎥 Rate limiting - skipping frame (too fast)');
       return;
     }
     
     // Additional stability check - ensure we have a reasonable frame size
     if (imageData.length < 1000) {
-      console.log('🎥 Frame too small, likely corrupted:', imageData.length, 'bytes');
+      //console.log('🎥 Frame too small, likely corrupted:', imageData.length, 'bytes');
       return;
     }
     
@@ -2460,7 +2456,8 @@ function initializeWebSocket() {
       lastValidFrame = imageData;
     }
     
-    console.log('🎥 Updating image element with image data');
+    //console.log('🎥 Updating image element with image data');
+    /*
     console.log('🎥 Image element details:', {
       tagName: imgEl.tagName,
       id: imgEl.id,
@@ -2469,7 +2466,7 @@ function initializeWebSocket() {
       height: imgEl.height,
       style: imgEl.style.cssText
     });
-    
+    */
     // Use the current frame or fallback to last valid frame
     const frameToUse = isSmallFrame && lastValidFrame ? lastValidFrame : imageData;
     
@@ -2483,7 +2480,7 @@ function initializeWebSocket() {
     }
     
     lastVideoUpdate = now;
-    console.log('🎥 Image updated successfully');
+    //console.log('🎥 Image updated successfully');
   }
 
 
@@ -2491,7 +2488,7 @@ function initializeWebSocket() {
   let audioTimeout = null;
 
   function updateAudioStream(audioData, sampleRate) {
-    console.log('🎵 Admin received audio:', audioData ? audioData.length : 0, 'bytes, sampleRate:', sampleRate);
+    //console.log('🎵 Admin received audio:', audioData ? audioData.length : 0, 'bytes, sampleRate:', sampleRate);
     
     const audioIndicator = document.getElementById('clientAudioIndicator');
     if (audioIndicator) {
@@ -2521,16 +2518,16 @@ function initializeWebSocket() {
         const audio = new Audio(audioUrl);
         audio.volume = 0.5; // Riduci volume per evitare feedback
         audio.play().then(() => {
-          console.log('🎵 Audio played successfully');
+          //console.log('🎵 Audio played successfully');
           // Cleanup dopo la riproduzione
           setTimeout(() => {
             URL.revokeObjectURL(audioUrl);
           }, 1000);
         }).catch(e => {
-          console.log('🎵 Audio play error:', e);
+          //console.log('🎵 Audio play error:', e);
         });
       } catch (error) {
-        console.log('🎵 Audio play error:', error);
+        //console.log('🎵 Audio play error:', error);
       }
       
       // Set timeout to detect audio loss
@@ -2630,7 +2627,7 @@ function initializeWebSocket() {
   }
 
   function loadChatHistory(messages) {
-    console.log(`📚 Loading chat history: ${messages.length} messages`);
+    //console.log(`📚 Loading chat history: ${messages.length} messages`);
     
     // Clear and load messages in normal chat
     const chatMessages = document.getElementById('chatMessages');
@@ -2653,7 +2650,7 @@ function initializeWebSocket() {
     // Load all messages from history
     messages.forEach((msg, index) => {
       const isMe = msg.from === 'Admin';
-      console.log(`📚 Loading message ${index + 1}: ${msg.from} - ${msg.text}`);
+      //console.log(`📚 Loading message ${index + 1}: ${msg.from} - ${msg.text}`);
       addMessage(msg.from, msg.text, isMe, msg.attachment, msg.timestamp);
     });
     
@@ -2665,7 +2662,7 @@ function initializeWebSocket() {
       fullscreenMessages.scrollTop = fullscreenMessages.scrollHeight;
     }
     
-    console.log(`📚 Chat history loaded: ${messages.length} messages`);
+    //console.log(`📚 Chat history loaded: ${messages.length} messages`);
   }
 
   // Camera controls
@@ -2675,7 +2672,7 @@ function initializeWebSocket() {
       frontCameraBtn.classList.add('active');
       backCameraBtn.classList.remove('active');
       
-      console.log('🎥 Switching to front camera');
+      //console.log('🎥 Switching to front camera');
       
       // Reset video stabilization state when switching cameras
       resetVideoState();
@@ -2687,7 +2684,7 @@ function initializeWebSocket() {
           targetRoom: selectedRoom,
           camera: 'front'
         }));
-        console.log('📤 Sent front camera command to client');
+        //console.log('📤 Sent front camera command to client');
       }
       
       // If camera is already running, restart with new camera
@@ -2714,7 +2711,7 @@ function initializeWebSocket() {
             cameraIndicator.textContent = 'Frontale';
           }
           
-          console.log('✅ Switched to front camera');
+          //console.log('✅ Switched to front camera');
         } catch (error) {
           console.error('❌ Error switching to front camera:', error);
         }
@@ -2728,7 +2725,7 @@ function initializeWebSocket() {
       backCameraBtn.classList.add('active');
       frontCameraBtn.classList.remove('active');
       
-      console.log('🎥 Switching to back camera');
+      //console.log('🎥 Switching to back camera');
       
       // Reset video stabilization state when switching cameras
       resetVideoState();
@@ -2740,7 +2737,7 @@ function initializeWebSocket() {
           targetRoom: selectedRoom,
           camera: 'back'
         }));
-        console.log('📤 Sent back camera command to client');
+        //console.log('📤 Sent back camera command to client');
       }
       
       // If camera is already running, restart with new camera
@@ -2767,7 +2764,7 @@ function initializeWebSocket() {
             cameraIndicator.textContent = 'Posteriore';
           }
           
-          console.log('✅ Switched to back camera');
+          //console.log('✅ Switched to back camera');
         } catch (error) {
           console.error('❌ Error switching to back camera:', error);
         }
@@ -2788,9 +2785,9 @@ function startAdminHeartbeat() {
   adminHeartbeatInterval = setInterval(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-      console.log('💓 Admin heartbeat sent');
+      //console.log('💓 Admin heartbeat sent');
     } else {
-      console.log('💔 Admin heartbeat failed - WebSocket not open');
+      //console.log('💔 Admin heartbeat failed - WebSocket not open');
       stopAdminHeartbeat();
     }
   }, 30000); // Every 30 seconds
@@ -2800,7 +2797,7 @@ function stopAdminHeartbeat() {
   if (adminHeartbeatInterval) {
     clearInterval(adminHeartbeatInterval);
     adminHeartbeatInterval = null;
-    console.log('💔 Admin heartbeat stopped');
+    //console.log('💔 Admin heartbeat stopped');
   }
 }
 
@@ -2814,24 +2811,24 @@ function stopAdminHeartbeat() {
   setTimeout(function() {
     document.addEventListener('click', function(e) {
       if (e.target.closest('.chat-section')) {
-        console.log('🔍 Chat section clicked, opening fullscreen');
+        //console.log('🔍 Chat section clicked, opening fullscreen');
         if (typeof openChatFullscreen === 'function') {
           openChatFullscreen();
         } else {
-          console.log('❌ openChatFullscreen function not defined yet');
+          //console.log('❌ openChatFullscreen function not defined yet');
         }
       }
     });
-    console.log('✅ Global chat fullscreen listener added');
+    //console.log('✅ Global chat fullscreen listener added');
     
     // Test the function
-    console.log('🔍 Testing openChatFullscreen function:', typeof openChatFullscreen === 'function');
-    console.log('🔍 Testing window.openChatFullscreen function:', typeof window.openChatFullscreen === 'function');
+    //console.log('🔍 Testing openChatFullscreen function:', typeof openChatFullscreen === 'function');
+    //console.log('🔍 Testing window.openChatFullscreen function:', typeof window.openChatFullscreen === 'function');
   }, 1000);
 
   // Disable PWA installation
   window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('🚫 PWA install prompt blocked');
+    //console.log('🚫 PWA install prompt blocked');
     e.preventDefault();
     return false;
   });
@@ -2840,14 +2837,14 @@ function stopAdminHeartbeat() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       registrations.forEach(registration => {
-        console.log('🚫 Unregistering service worker:', registration.scope);
+        //console.log('🚫 Unregistering service worker:', registration.scope);
         registration.unregister();
       });
     });
     
     // Prevent any new service worker registration
     navigator.serviceWorker.register = function() {
-      console.log('🚫 Service worker registration blocked');
+      //console.log('🚫 Service worker registration blocked');
       return Promise.reject(new Error('Service worker registration disabled'));
     };
   }
@@ -2855,7 +2852,7 @@ function stopAdminHeartbeat() {
   // Disable push notifications completely
   if ('Notification' in window) {
     if (Notification.permission === 'granted') {
-      console.log('🚫 Push notifications disabled');
+      //console.log('🚫 Push notifications disabled');
     }
   }
 
@@ -2865,7 +2862,7 @@ function stopAdminHeartbeat() {
       if (registration.pushManager) {
         registration.pushManager.getSubscription().then(subscription => {
           if (subscription) {
-            console.log('🚫 Removing existing push subscription');
+            //console.log('🚫 Removing existing push subscription');
             subscription.unsubscribe();
           }
         });
